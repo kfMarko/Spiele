@@ -128,6 +128,7 @@ $("btnGo").onclick = async () => {
   SA.wake();
   G.word = ""; G.log = [];
   $("play").hidden = false; $("play").className = G.rot ? "rot" : "";
+  G.upPortrait = false; applyRot();
   $("pCat").textContent = G.cat === MIX ? "Mix" : G.cat;
   // Countdown, damit man das Handy an die Stirn halten kann
   let c = 3; $("pWord").textContent = c; $("pTime").textContent = "Handy an die Stirn!";
@@ -172,11 +173,12 @@ $("tapPass").onclick = () => mark(false);
 window.addEventListener("devicemotion", e => {
   if ($("play").hidden) return;
   const a = e.accelerationIncludingGravity; if (!a || a.z == null) return;
-  // Querformat erzwingen: Ist die Seite hochkant (Ausrichtungssperre), aber das Handy liegt quer, Wort drehen
+  // Querformat halten: Seite merkt sich, wie herum das Handy quer gehalten wird,
+  // und bleibt auch beim Kippen (Handy fast flach) im Querformat
   if (a.x != null && a.y != null) {
-    const gx = a.x * (isIOS ? -1 : 1);
-    if (window.innerHeight > window.innerWidth && Math.abs(a.x) > Math.abs(a.y) + 2) setRot(gx > 0 ? 90 : -90);
-    else if (Math.abs(a.y) > Math.abs(a.x) + 2 || window.innerWidth >= window.innerHeight) setRot(0);
+    if (Math.abs(a.x) > 6) G.side = a.x * (isIOS ? -1 : 1) > 0 ? 90 : -90;
+    G.upPortrait = Math.abs(a.y) > 7 && Math.abs(a.y) > Math.abs(a.x) + 2;
+    applyRot();
   }
   // s > 0: Bildschirm zeigt nach oben, s < 0: Bildschirm zeigt nach unten
   let s = a.z * (isIOS ? -1 : 1) * (dirFlip ? -1 : 1);
@@ -185,6 +187,13 @@ window.addEventListener("devicemotion", e => {
   if (s > 6.5) { G.neutral = false; mark(true); }
   else if (s < -6.5) { G.neutral = false; mark(false); }
 });
+
+function applyRot() {
+  if ($("play").hidden) return;
+  setRot(window.innerHeight > window.innerWidth && !G.upPortrait ? (G.side || 90) : 0);
+}
+window.addEventListener("resize", applyRot);
+window.addEventListener("orientationchange", () => setTimeout(applyRot, 200));
 
 function setRot(d) {
   if (G.rot === d) return; G.rot = d;
