@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1c1418">
+<title>Stille Post rückwärts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=DM+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="../common.css">
+<style>
+.chain{display:flex;flex-direction:column;gap:8px;width:100%}
+.chain button{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;text-align:left;border-left:6px solid var(--pc)}
+.chain button small{color:var(--muted);font-weight:400}
+.secret{font-family:var(--display);font-size:1.5rem;font-weight:800;text-wrap:balance}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spieleabend</a><span class="label" id="roundLbl"></span></div>
+  <div class="board" id="board" hidden></div>
+
+  <section class="scr card" id="scrSetup">
+    <h1>Stille Post rückwärts</h1>
+    <p class="muted">Der Erste nimmt heimlich einen kurzen Satz auf. Jeder Nächste hört nur die <b>umgedrehte</b> Aufnahme seines Vorgängers und spricht sie nach, so gut es geht. Der Letzte rät den Original-Satz. Zum Schluss hört ihr die ganze Kette – garantiert Chaos.</p>
+    <div id="setup"></div>
+  </section>
+
+  <section class="scr card" id="scrStart" hidden>
+    <span class="label">Start der Kette</span>
+    <h2 id="sTitle"></h2>
+    <p class="muted small">Alle anderen hören weg. Kurze Sätze (3–6 Wörter) funktionieren am besten.</p>
+    <div class="step"><b>1</b><span>Satz eintippen (bleibt geheim)</span></div>
+    <input type="text" id="phrase" placeholder="z. B. Der Hund isst Spaghetti" autocomplete="off">
+    <button class="ghost" id="btnIdea">Idee 🎲</button>
+    <div class="step"><b>2</b><span>Satz deutlich aufnehmen</span></div>
+    <div id="recStart"></div>
+    <button class="primary" id="btnStartDone" disabled>Fertig – weitergeben</button>
+  </section>
+
+  <section class="scr card center" id="scrHand" hidden>
+    <span class="label" id="hStep"></span>
+    <h2 id="hTitle"></h2>
+    <p class="muted">Nur du hörst jetzt zu. Die anderen bitte weghören.</p>
+    <button class="primary" id="btnTake"></button>
+  </section>
+
+  <section class="scr card" id="scrLink" hidden>
+    <span class="label" id="lStep"></span>
+    <h2 id="lTitle"></h2>
+    <div class="step"><b>1</b><span>Umgedrehte Aufnahme anhören (max. 3×)</span></div>
+    <canvas class="wave" id="lWave" width="600" height="112"></canvas>
+    <button class="play" id="lPlay">◀◀ Abspielen</button>
+    <div class="step"><b>2</b><span>Genau so nachsprechen, wie es klingt</span></div>
+    <div id="recLink"></div>
+    <button class="primary" id="btnLinkDone" disabled>Fertig – weitergeben</button>
+  </section>
+
+  <section class="scr card" id="scrGuess" hidden>
+    <span class="label">Letzte Station</span>
+    <h2 id="gTitle"></h2>
+    <p class="muted small">Hör dir die umgedrehte Aufnahme an. Was war wohl der Original-Satz?</p>
+    <canvas class="wave" id="gWave" width="600" height="112"></canvas>
+    <button class="play" id="gPlay">◀◀ Abspielen</button>
+    <input type="text" id="guess" placeholder="Mein Tipp für den Satz" autocomplete="off">
+    <button class="primary" id="btnGuess" disabled>Auflösen</button>
+  </section>
+
+  <section class="scr card center" id="scrEnd" hidden>
+    <span class="label">Der Original-Satz</span>
+    <p class="secret" id="eOrig"></p>
+    <p class="muted">Tipp von <b id="eWho"></b>: „<span id="eGuess"></span>“</p>
+    <button class="hot" id="btnChain">▶ Ganze Kette abspielen</button>
+    <div class="chain" id="chain"></div>
+    <p class="muted small">Alle Aufnahmen sind so gedreht, dass sie „vorwärts“ klingen sollten.</p>
+    <button class="primary" id="btnAgain">Neue Kette</button>
+    <button class="ghost" id="btnNew">Andere Spieler</button>
+  </section>
+</div>
+
+<script src="../common.js"></script>
+<script src="../audio.js"></script>
+<script>
+const SAETZE = ["Der Hund isst Spaghetti","Ich liebe Bratwurst","Meine Oma fährt Motorrad","Die Katze spielt Klavier","Banane mit Senf","Heute regnet es Pizza","Der Elektriker hat Feierabend","Wo ist mein Ladekabel","Ich bin ein Pinguin","Kühlschrank auf, Licht an","Mein Auto ist ein Toaster","Der Kaffee ist kalt","Schwäbische Maultaschen","Gib mir die Fernbedienung","Ich habe Hunger","Wir gehen ins Kino","Die Giraffe trägt eine Krawatte","Spätzle mit Soße","Opa tanzt Breakdance","Der Chef ist im Urlaub","Sicherung rausgeflogen","Ich will ein Pony","Der Döner ist leer","Kartoffelsalat mit Würstchen","Das Handy ist im Klo","Fliegende Fische","Morgen ist Montag","Ich kann nicht schwimmen","Die Pizza ist verbrannt","Mama ruft an","Gummibärchen zum Frühstück","Der Bagger baggert","Schmetterlinge im Bauch","Ich habe keine Socken an","Wer hat meinen Joghurt gegessen","Der Bus kommt zu spät","Zahnpasta auf dem Brot","Kein Strom in der Küche","Das Krokodil lacht","Ich bin müde","Wir sind die Champions","Ein Elefant im Wohnzimmer","Der Kuchen ist im Ofen","Bitte nicht stören","Hallo, ist da jemand","Rote Ampel","Mein Name ist Hase","Ich weiß von nichts","Alles im grünen Bereich","Der Drucker druckt nicht","Wassermelone im Kofferraum","Hotdog mit Ketchup","Der Mond ist aus Käse","Nimm die Leiter mit","Wo ist die Baustelle","Ich hab Rücken","Der Fernseher ist kaputt","Schnee im Sommer","Das Pferd spricht Englisch","Popcorn im Bett","Der Wecker klingelt","Pommes rot-weiß","Mein Bruder ist ein Vampir","Ich spiele Schach mit dem Hund","Der Kran wackelt","Heute ist Waschtag","Eis am Stiel","Der Zug fällt aus","Achtung, frisch gestrichen","Die Lampe flackert","Ich esse nur grüne Sachen","Das ist mein Platz","Lasst uns tanzen","Kein Netz im Keller","Die Kuh macht muh","Ein Hai im Pool","Ich trinke Milch mit Strohhalm","Der Papagei sagt Hallo","Pass auf die Steckdose auf","Das war nicht ich"];
+const { $, show, board } = SA;
+const G = { players: [], start: 0, recs: [], phrase: "", k: 0, plays: 0 };
+const n = () => G.players.length, at = k => (G.start + k) % n();
+
+SA.setup($("setup"), { min: 3, max: 6, onStart(names) { G.players = names.map(x => ({ name: x, score: 0 })); G.start = 0; newChain(); } });
+
+function drawBoard(a) { board($("board"), G.players, { active: a, fmt: (p, i) => { const k = (i - G.start + n()) % n(); return k < G.recs.length ? "✓" : k + 1 + "."; } }); }
+
+const recStart = AR.recorder($("recStart"), b => { G.recs[0] = b; checkStart(); });
+const recLink = AR.recorder($("recLink"), b => { G.recs[G.k] = b; $("btnLinkDone").disabled = false; });
+function checkStart() { $("btnStartDone").disabled = !(G.recs[0] && $("phrase").value.trim()); }
+
+function newChain() {
+  G.recs = []; G.k = 0; $("phrase").value = ""; $("guess").value = ""; recStart.reset();
+  $("btnStartDone").disabled = true;
+  $("roundLbl").textContent = n() + " Stationen";
+  drawBoard(at(0));
+  $("sTitle").textContent = G.players[at(0)].name + ", du startest";
+  show("scrStart");
+}
+$("btnIdea").onclick = () => { $("phrase").value = SA.fresh("stillepost", SAETZE, 1)[0]; checkStart(); };
+$("phrase").addEventListener("input", checkStart);
+$("btnStartDone").onclick = () => { AR.stop(); G.phrase = $("phrase").value.trim(); G.k = 1; handTo(); };
+
+function handTo() {
+  const i = at(G.k);
+  drawBoard(i);
+  $("hStep").textContent = "Station " + (G.k + 1) + " von " + n();
+  $("hTitle").textContent = "Gib das Handy an " + G.players[i].name;
+  $("btnTake").textContent = "Ich bin " + G.players[i].name + " – los";
+  show("scrHand");
+}
+$("btnTake").onclick = () => {
+  const i = at(G.k), prevRev = AR.reverse(G.recs[G.k - 1]); G.cur = prevRev; G.plays = 0;
+  if (G.k === n() - 1) {
+    $("gTitle").textContent = G.players[i].name + ", rate den Satz";
+    AR.drawWave($("gWave"), prevRev); $("gPlay").disabled = false; $("gPlay").textContent = "◀◀ Abspielen";
+    show("scrGuess");
+  } else {
+    $("lStep").textContent = "Station " + (G.k + 1) + " von " + n();
+    $("lTitle").textContent = G.players[i].name + ", hör genau hin";
+    AR.drawWave($("lWave"), prevRev); recLink.reset(); $("btnLinkDone").disabled = true;
+    $("lPlay").disabled = false; $("lPlay").textContent = "◀◀ Abspielen (3 übrig)";
+    show("scrLink");
+  }
+};
+$("lPlay").onclick = () => {
+  if (G.plays >= 3) return; G.plays++; AR.play(G.cur);
+  $("lPlay").textContent = G.plays >= 3 ? "Keine Wiederholung mehr" : "◀◀ Nochmal (" + (3 - G.plays) + " übrig)";
+  $("lPlay").disabled = G.plays >= 3;
+};
+$("btnLinkDone").onclick = () => { AR.stop(); G.k++; handTo(); };
+$("gPlay").onclick = () => AR.play(G.cur);
+$("guess").addEventListener("input", () => $("btnGuess").disabled = !$("guess").value.trim());
+
+// "Vorwärts"-Version jeder Aufnahme: jede zweite ist umgedreht nachgesprochen
+function forward(k) { return k % 2 === 0 ? G.recs[k] : AR.reverse(G.recs[k]); }
+$("btnGuess").onclick = () => {
+  AR.stop();
+  $("eOrig").textContent = G.phrase; $("eWho").textContent = G.players[at(n() - 1)].name; $("eGuess").textContent = $("guess").value.trim();
+  $("chain").innerHTML = G.recs.map((_, k) => `<button class="pc${at(k)}" data-k="${k}"><b>${k + 1}.</b><span>${SA.esc(G.players[at(k)].name)}<br><small>${k === 0 ? "Original" : "Nachgemacht"}</small></span><span>▶</span></button>`).join("");
+  $("chain").querySelectorAll("button").forEach(b => b.onclick = () => AR.play(forward(+b.dataset.k)));
+  drawBoard(-1); show("scrEnd");
+};
+$("btnChain").onclick = async () => {
+  $("btnChain").disabled = true;
+  for (let k = 0; k < G.recs.length; k++) {
+    $("chain").querySelectorAll("button").forEach(b => b.classList.toggle("primary", +b.dataset.k === k));
+    await AR.play(forward(k)); await new Promise(r => setTimeout(r, 350));
+  }
+  $("chain").querySelectorAll("button").forEach(b => b.classList.remove("primary"));
+  $("btnChain").disabled = false;
+};
+$("btnAgain").onclick = () => { AR.stop(); G.start = (G.start + 1) % n(); newChain(); };
+$("btnNew").onclick = () => { AR.stop(); $("board").hidden = true; $("roundLbl").textContent = ""; show("scrSetup"); };
+</script>
+</body>
+</html>

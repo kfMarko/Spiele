@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1c1418">
+<title>Stirn-Raten</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=DM+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="../common.css">
+<style>
+#play{position:fixed;inset:0;z-index:50;background:var(--deck);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));text-align:center;transition:background .15s}
+#play.ok{background:#2f7a3c} #play.pass{background:#9a5a1f}
+#play .word{font-family:var(--display);font-weight:800;font-size:clamp(2.2rem,11vw,5rem);line-height:1.05;word-break:break-word;text-wrap:balance}
+#play .time{font-family:var(--display);font-size:1.6rem;font-variant-numeric:tabular-nums}
+#play .cat{font-size:.85rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+#play .taps{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;opacity:0}
+#play .taps button{border:0;border-radius:0;background:transparent;min-height:100%}
+#play .legend{position:absolute;bottom:max(12px,env(safe-area-inset-bottom));left:0;right:0;display:flex;justify-content:space-between;padding:0 max(18px,env(safe-area-inset-left));font-size:.8rem;color:var(--muted);pointer-events:none}
+.list{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left}
+.list div{padding:8px 12px;border-radius:10px;background:var(--bg);display:flex;justify-content:space-between;gap:10px}
+.list .y{color:var(--ok)} .list .n{color:var(--muted);text-decoration:line-through}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spieleabend</a><span class="label" id="roundLbl"></span></div>
+  <div class="board" id="board" hidden></div>
+
+  <section class="scr card" id="scrSetup">
+    <h1>Stirn-Raten</h1>
+    <p class="muted">Einer hält das Handy an die Stirn, Bildschirm nach außen. Die anderen erklären den Begriff. Erraten → Handy nach unten kippen. Passen → nach oben kippen. Jeder richtige Begriff = 1 Punkt.</p>
+    <div id="setup"></div>
+  </section>
+
+  <section class="scr card center" id="scrTurn" hidden>
+    <span class="label">Als Nächstes rät</span>
+    <div class="big" id="tName"></div>
+    <div id="wheel"></div>
+    <p class="big" id="tCat" style="font-size:1.3rem;min-height:1.5em"></p>
+    <button class="hot" id="btnSpin">Kategorie drehen</button>
+    <button class="primary" id="btnGo" hidden>Handy an die Stirn – Start</button>
+    <p class="muted small" id="tHint">Querformat halten, Bildschirm zu den anderen. Ohne Sensor: rechte Hälfte tippen = richtig, linke = weiter.</p>
+    <button class="ghost small" id="btnFlipDir" style="min-height:40px;padding:6px 12px">Kipprichtung vertauscht? Hier tauschen</button>
+  </section>
+
+  <section class="scr card center" id="scrDone" hidden>
+    <span class="label">Zeit um</span>
+    <div class="big" id="dRes"></div>
+    <div class="list" id="dList"></div>
+    <button class="primary" id="btnNext">Weiter</button>
+  </section>
+
+  <section class="scr card center" id="scrWin" hidden>
+    <span class="label">Gewonnen</span>
+    <div class="big" id="wName"></div>
+    <div class="rank" id="wRank"></div>
+    <button class="primary" id="btnRematch">Revanche</button>
+    <button class="ghost" id="btnNew">Andere Spieler</button>
+  </section>
+</div>
+
+<div id="play" hidden>
+  <span class="cat" id="pCat"></span>
+  <div class="word" id="pWord"></div>
+  <div class="time" id="pTime"></div>
+  <div class="taps"><button id="tapPass" aria-label="Weiter"></button><button id="tapOk" aria-label="Richtig"></button></div>
+  <div class="legend"><span>◀ Tipp: weiter</span><span>richtig: Tipp ▶</span></div>
+</div>
+
+<script src="../common.js"></script>
+<script src="begriffe.js"></script>
+<script>
+const { $, esc, show, fresh, board, rank } = SA;
+const CATS = Object.keys(KATEGORIEN);
+const POOL = Object.fromEntries(CATS.map(c => [c, KATEGORIEN[c].split(",").map(s => s.trim())]));
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let dirFlip = SA.store.get("sa.stirn.flip", false);
+
+const G = { players: [], rounds: 3, secs: 60, round: 1, turn: 0, cat: null, words: [], wi: 0, log: [], t: 0, iv: 0, neutral: true, motion: false };
+const wheel = SA.wheel($("wheel"), CATS);
+
+SA.setup($("setup"), {
+  min: 2, max: 6,
+  extra: `<span class="label">Runden (jeder rät pro Runde einmal)</span><div class="seg" id="rnd"><button type="button" data-v="2">2</button><button type="button" data-v="3" class="on">3</button><button type="button" data-v="4">4</button></div>
+  <span class="label">Zeit pro Zug</span><div class="seg" id="sec"><button type="button" data-v="45">45 s</button><button type="button" data-v="60" class="on">60 s</button><button type="button" data-v="90">90 s</button></div>`,
+  onStart(names) {
+    G.players = names.map(n => ({ name: n, score: 0 }));
+    G.rounds = +document.querySelector("#rnd .on").dataset.v;
+    G.secs = +document.querySelector("#sec .on").dataset.v;
+    G.round = 1; G.turn = 0; nextTurn();
+  }
+});
+["rnd", "sec"].forEach(id => document.querySelectorAll("#" + id + " button").forEach(b => b.onclick = () => { document.querySelectorAll("#" + id + " button").forEach(x => x.classList.remove("on")); b.classList.add("on"); }));
+
+function drawBoard(a = -1) { board($("board"), G.players, { active: a }); $("roundLbl").textContent = "Runde " + G.round + " von " + G.rounds; }
+
+function nextTurn() {
+  drawBoard(G.turn);
+  $("tName").textContent = G.players[G.turn].name;
+  $("tCat").textContent = ""; G.cat = null;
+  $("btnSpin").hidden = false; $("btnSpin").disabled = false; $("btnGo").hidden = true;
+  show("scrTurn");
+}
+$("btnSpin").onclick = async () => {
+  $("btnSpin").disabled = true; SA.audio();
+  const i = await wheel.spin();
+  G.cat = CATS[i]; $("tCat").textContent = G.cat;
+  $("btnSpin").hidden = true; $("btnGo").hidden = false;
+};
+$("btnFlipDir").onclick = () => { dirFlip = !dirFlip; SA.store.set("sa.stirn.flip", dirFlip); $("btnFlipDir").textContent = "Kipprichtung getauscht ✓"; };
+
+$("btnGo").onclick = async () => {
+  G.motion = await SA.motionPermission() || !(window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function");
+  SA.wake();
+  G.words = fresh("stirn." + G.cat, POOL[G.cat], 40);
+  G.wi = 0; G.log = [];
+  $("play").hidden = false; $("play").className = "";
+  $("pCat").textContent = G.cat;
+  // Countdown, damit man das Handy an die Stirn halten kann
+  let c = 3; $("pWord").textContent = c; $("pTime").textContent = "Handy an die Stirn!";
+  G.active = false;
+  const cd = setInterval(() => {
+    c--; SA.beep(600, .08);
+    if (c > 0) { $("pWord").textContent = c; return; }
+    clearInterval(cd); startClock();
+  }, 1000);
+};
+
+function startClock() {
+  G.active = true; G.neutral = true;
+  G.end = Date.now() + G.secs * 1000;
+  showWord(); SA.beep(1000, .15);
+  G.iv = setInterval(() => {
+    const left = Math.ceil((G.end - Date.now()) / 1000);
+    $("pTime").textContent = left + " s";
+    if (left <= 5 && left > 0) SA.beep(500, .05);
+    if (left <= 0) finish();
+  }, 250);
+}
+function showWord() {
+  if (G.wi >= G.words.length) G.words = G.words.concat(fresh("stirn." + G.cat, POOL[G.cat], 40));
+  $("pWord").textContent = G.words[G.wi];
+  $("play").className = "";
+}
+function mark(ok) {
+  if (!G.active) return;
+  G.log.push({ w: G.words[G.wi], ok });
+  G.wi++;
+  $("play").className = ok ? "ok" : "pass";
+  ok ? SA.beep(1200, .12, "triangle") : SA.beep(300, .12, "sawtooth");
+  SA.buzz(ok ? 60 : 150);
+  G.active = false;
+  setTimeout(() => { if (Date.now() < G.end) { G.active = true; showWord(); } }, 600);
+}
+$("tapOk").onclick = () => mark(true);
+$("tapPass").onclick = () => mark(false);
+
+window.addEventListener("devicemotion", e => {
+  if ($("play").hidden) return;
+  const a = e.accelerationIncludingGravity; if (!a || a.z == null) return;
+  // s > 0: Bildschirm zeigt nach oben, s < 0: Bildschirm zeigt nach unten
+  let s = a.z * (isIOS ? -1 : 1) * (dirFlip ? -1 : 1);
+  if (Math.abs(s) < 3.5) { G.neutral = true; return; }
+  if (!G.neutral || !G.active) return;
+  if (s < -6.5) { G.neutral = false; mark(true); }
+  else if (s > 6.5) { G.neutral = false; mark(false); }
+});
+
+function finish() {
+  clearInterval(G.iv); G.active = false;
+  $("play").hidden = true;
+  SA.beep(200, .4, "sawtooth");
+  const pts = G.log.filter(x => x.ok).length;
+  G.players[G.turn].score += pts;
+  $("dRes").textContent = G.players[G.turn].name + ": " + pts + (pts === 1 ? " Punkt" : " Punkte");
+  $("dList").innerHTML = G.log.length ? G.log.map(x => `<div class="${x.ok ? "y" : "n"}"><span>${esc(x.w)}</span><span>${x.ok ? "✓" : "–"}</span></div>`).join("") : `<div>Kein Begriff geschafft</div>`;
+  drawBoard(G.turn);
+  show("scrDone");
+}
+
+$("btnNext").onclick = () => {
+  G.turn++;
+  if (G.turn >= G.players.length) {
+    G.turn = 0;
+    if (G.round >= G.rounds) {
+      const sc = G.players.map(p => p.score), m = Math.max(...sc);
+      if (sc.filter(s => s === m).length === 1) { win(sc.indexOf(m)); return; }
+      // Gleichstand: eine Extrarunde
+    }
+    G.round++;
+  }
+  nextTurn();
+};
+function win(w) { $("wName").textContent = G.players[w].name; rank($("wRank"), G.players); drawBoard(); show("scrWin"); }
+$("btnRematch").onclick = () => { G.players.forEach(p => p.score = 0); G.round = 1; G.turn = 0; nextTurn(); };
+$("btnNew").onclick = () => { $("board").hidden = true; $("roundLbl").textContent = ""; show("scrSetup"); };
+</script>
+</body>
+</html>

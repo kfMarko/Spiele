@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1c1418">
+<title>Rückwärts-Rätsel</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=DM+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="../common.css">
+<style>h1 .rev{display:inline-block;transform:scaleX(-1);color:var(--accent)}</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spieleabend</a><span class="label" id="roundLbl"></span></div>
+  <div class="board" id="board" hidden></div>
+
+  <section class="scr card" id="scrSetup">
+    <h1>Rückwärts-<span class="rev">Rätsel</span></h1>
+    <p class="muted">Einer sagt heimlich ein Wort. Der Nächste hört es nur rückwärts, spricht es so gut wie möglich nach und dreht seine Aufnahme wieder um. Dann rät er. Richtig: Rater +2, Sprecher +1. Danach rückt alles einen Platz weiter.</p>
+    <div id="setup"></div>
+  </section>
+
+  <section class="scr card" id="scrSpeak" hidden>
+    <span class="label">Sprecher</span>
+    <h2 id="speakTitle"></h2>
+    <p class="muted small" id="speakSub"></p>
+    <div class="step"><b>1</b><span>Wort heimlich eintippen</span></div>
+    <div class="row">
+      <input type="text" id="word" placeholder="z. B. Kühlschrank" autocomplete="off" style="flex:2 1 180px">
+      <button id="btnIdea" class="ghost" style="flex:1 1 90px">Idee 🎲</button>
+    </div>
+    <div class="step"><b>2</b><span>Wort deutlich aufnehmen</span></div>
+    <div id="recA"></div>
+    <div class="row">
+      <button class="play" id="playAr" disabled>◀◀ Rückwärts</button>
+      <button id="playAf" disabled>Vorwärts ▶</button>
+    </div>
+    <button class="primary" id="btnHand" disabled>Fertig – Handy weitergeben</button>
+  </section>
+
+  <section class="scr card center" id="scrHand" hidden>
+    <h2 id="handTitle"></h2>
+    <p class="muted">Nicht spicken – das Wort bleibt geheim.</p>
+    <button class="primary" id="btnTake"></button>
+  </section>
+
+  <section class="scr card" id="scrGuess" hidden>
+    <span class="label">Rater</span>
+    <h2 id="guessTitle"></h2>
+    <div class="step"><b>1</b><span>Das Wort rückwärts anhören (so oft du willst)</span></div>
+    <canvas class="wave" id="waveA" width="600" height="112"></canvas>
+    <div class="row">
+      <button class="play" id="gPlay">◀◀ Abspielen</button>
+      <button id="gSlow">◀◀ Langsam</button>
+    </div>
+    <div class="step"><b>2</b><span>So nachsprechen, wie du es hörst</span></div>
+    <div id="recB"></div>
+    <div class="step"><b>3</b><span>Deine Aufnahme umgedreht anhören</span></div>
+    <button class="play" id="gPlayB" disabled>◀◀ Meine Aufnahme rückwärts</button>
+    <div class="step"><b>4</b><span>Was war das Wort?</span></div>
+    <input type="text" id="guess" placeholder="Dein Tipp" autocomplete="off">
+    <button class="primary" id="btnReveal" disabled>Auflösen</button>
+  </section>
+
+  <section class="scr card center" id="scrReveal" hidden>
+    <span class="label">Das Wort war</span>
+    <div class="big" id="rWord"></div>
+    <p class="muted">Tipp: <b id="rGuess"></b></p>
+    <div class="big" id="rVerdict" style="font-size:1.25rem"></div>
+    <button class="ghost small" id="btnFlip" style="min-height:44px;padding:8px 14px"></button>
+    <div class="row" style="width:100%">
+      <button id="rA">Original ▶</button>
+      <button class="play" id="rB">Nachgemacht umgedreht</button>
+    </div>
+    <button class="primary" id="btnNext">Weiter</button>
+  </section>
+
+  <section class="scr card center" id="scrWin" hidden>
+    <span class="label">Gewonnen</span>
+    <div class="big" id="wName"></div>
+    <div class="rank" id="wRank"></div>
+    <button class="primary" id="btnRematch">Revanche</button>
+    <button class="ghost" id="btnNew">Andere Spieler</button>
+  </section>
+</div>
+
+<script src="../common.js"></script>
+<script src="../audio.js"></script>
+<script>
+const WORDS = ["Banane","Kühlschrank","Schmetterling","Pizza","Giraffe","Staubsauger","Krokodil","Regenschirm","Zahnbürste","Ananas","Elefant","Fahrrad","Schokolade","Kartoffel","Pinguin","Toaster","Spaghetti","Feuerwehr","Bratwurst","Trampolin","Hubschrauber","Gurke","Marmelade","Waschmaschine","Taschenlampe","Schraubenzieher","Steckdose","Glühbirne","Sicherung","Kabeltrommel","Bohrmaschine","Leiter","Lichtschalter","Verlängerung","Hammer","Zange","Baustelle","Bagger","Kran","Zement","Kaffee","Tomate","Brezel","Maultasche","Spätzle","Käsekuchen","Erdbeere","Wassermelone","Zitrone","Popcorn","Hamburger","Pommes","Ketchup","Senf","Joghurt","Müsli","Honig","Avocado","Brokkoli","Karotte","Zwiebel","Knoblauch","Paprika","Kokosnuss","Mango","Kaninchen","Hamster","Papagei","Schildkröte","Känguru","Zebra","Flamingo","Delfin","Oktopus","Qualle","Eichhörnchen","Igel","Ameise","Biene","Schnecke","Gorilla","Tiger","Löwe","Kamel","Lama","Fußball","Basketball","Schwimmbad","Skateboard","Rakete","Astronaut","Dinosaurier","Vampir","Gespenst","Zauberer","Pirat","Ritter","Prinzessin","Roboter","Monster","Handy","Kopfhörer","Fernseher","Computer","Tastatur","Ladekabel","Kamera","Mikrofon","Lautsprecher","Wecker","Sonnenbrille","Rucksack","Turnschuh","Socke","Pullover","Badehose","Mütze","Regenbogen","Gewitter","Schneemann","Vulkan","Wasserfall","Kaktus","Sonnenblume","Tannenbaum","Geburtstag","Weihnachten","Urlaub","Flugzeug","Motorrad","Traktor","Straßenbahn","Polizei","Krankenwagen","Bürgermeister","Kindergarten","Hausaufgaben","Abendroutine","Wasserflasche","Spiegelei","Gummibärchen","Lebkuchen","Zuckerwatte","Achterbahn","Karussell","Luftballon","Seifenblase","Kissenschlacht","Badewanne","Dusche","Handtuch","Zahnpasta"];
+const { $, show, board, rank } = SA;
+const G = { players: [], target: 10, turn: 0, round: 1, word: "", bufA: null, revA: null, bufB: null, revB: null, correct: false };
+const n = () => G.players.length, spk = () => G.turn % n(), gss = () => (G.turn + 1) % n();
+
+function norm(s) { return (s || "").toLowerCase().trim().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]/g, ""); }
+function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
+function isMatch(w, g) { const a = norm(w), b = norm(g); if (!a || !b) return false; return a === b || (a.length >= 6 && lev(a, b) <= 1); }
+
+SA.setup($("setup"), {
+  min: 2, max: 6,
+  extra: `<span class="label">Spiel geht bis</span><div class="seg" id="tgt"><button type="button" data-t="6">6</button><button type="button" data-t="10" class="on">10</button><button type="button" data-t="15">15</button></div>`,
+  onStart(names) {
+    G.players = names.map(x => ({ name: x, score: 0 }));
+    G.target = +document.querySelector("#tgt .on").dataset.t;
+    G.turn = 0; G.round = 1; startTurn();
+  }
+});
+document.querySelectorAll("#tgt button").forEach(b => b.onclick = () => { document.querySelectorAll("#tgt button").forEach(x => x.classList.remove("on")); b.classList.add("on"); });
+
+const recA = AR.recorder($("recA"), b => { G.bufA = b; G.revA = AR.reverse(b); $("playAr").disabled = false; $("playAf").disabled = false; checkHand(); });
+const recB = AR.recorder($("recB"), b => { G.bufB = b; G.revB = AR.reverse(b); $("gPlayB").disabled = false; });
+function checkHand() { $("btnHand").disabled = !(G.bufA && $("word").value.trim()); }
+
+function drawBoard(a = -1) { board($("board"), G.players, { active: a }); $("roundLbl").textContent = "Runde " + G.round + " · bis " + G.target; }
+
+function startTurn() {
+  G.word = ""; G.bufA = G.revA = G.bufB = G.revB = null;
+  $("word").value = ""; $("guess").value = "";
+  ["playAr", "playAf", "btnHand", "gPlayB", "btnReveal"].forEach(id => $(id).disabled = true);
+  recA.reset(); recB.reset();
+  drawBoard(spk());
+  $("speakTitle").textContent = G.players[spk()].name + ", du sagst ein Wort";
+  $("speakSub").textContent = G.players[gss()].name + " schaut und hört weg!";
+  show("scrSpeak");
+}
+$("btnIdea").onclick = () => { $("word").value = SA.fresh("rueckwaerts", WORDS, 1)[0]; checkHand(); };
+$("word").addEventListener("input", checkHand);
+$("playAr").onclick = () => AR.play(G.revA);
+$("playAf").onclick = () => AR.play(G.bufA);
+$("btnHand").onclick = () => {
+  AR.stop(); G.word = $("word").value.trim();
+  $("handTitle").textContent = "Gib das Handy an " + G.players[gss()].name;
+  $("btnTake").textContent = "Ich bin " + G.players[gss()].name + " – los";
+  show("scrHand");
+};
+$("btnTake").onclick = () => {
+  $("guessTitle").textContent = G.players[gss()].name + ", was hat " + G.players[spk()].name + " gesagt?";
+  AR.drawWave($("waveA"), G.revA); drawBoard(gss()); show("scrGuess");
+};
+$("gPlay").onclick = () => AR.play(G.revA);
+$("gSlow").onclick = () => AR.play(G.revA, .75);
+$("gPlayB").onclick = () => AR.play(G.revB);
+$("guess").addEventListener("input", () => $("btnReveal").disabled = !$("guess").value.trim());
+$("btnReveal").onclick = () => {
+  AR.stop(); G.correct = isMatch(G.word, $("guess").value);
+  $("rWord").textContent = G.word; $("rGuess").textContent = $("guess").value.trim();
+  $("rB").disabled = !G.revB; verdict(); show("scrReveal");
+};
+function verdict() {
+  $("rVerdict").textContent = G.correct ? "Richtig! " + G.players[gss()].name + " +2, " + G.players[spk()].name + " +1" : "Leider falsch – keine Punkte";
+  $("rVerdict").style.color = G.correct ? "var(--ok)" : "var(--bad)";
+  $("btnFlip").textContent = G.correct ? "Doch falsch werten" : "Doch richtig werten";
+}
+$("btnFlip").onclick = () => { G.correct = !G.correct; verdict(); };
+$("rA").onclick = () => AR.play(G.bufA);
+$("rB").onclick = () => AR.play(G.revB);
+$("btnNext").onclick = () => {
+  AR.stop();
+  if (G.correct) { G.players[gss()].score += 2; G.players[spk()].score += 1; }
+  G.turn++;
+  if (G.turn % n() === 0) {
+    const sc = G.players.map(p => p.score), m = Math.max(...sc);
+    if (m >= G.target && sc.filter(s => s === m).length === 1) {
+      $("wName").textContent = G.players[sc.indexOf(m)].name; rank($("wRank"), G.players); drawBoard(); show("scrWin"); return;
+    }
+    G.round++;
+  }
+  startTurn();
+};
+$("btnRematch").onclick = () => { G.players.forEach(p => p.score = 0); G.turn = 0; G.round = 1; startTurn(); };
+$("btnNew").onclick = () => { $("board").hidden = true; $("roundLbl").textContent = ""; show("scrSetup"); };
+</script>
+</body>
+</html>

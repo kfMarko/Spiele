@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1c1418">
+<title>Zahlen-Imposter</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=DM+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="../common.css">
+<style>
+.flip{perspective:1200px;width:100%}
+.flip .inner{position:relative;width:100%;min-height:300px;transition:transform .6s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}
+.flip.open .inner{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;text-align:center}
+.front{background:repeating-linear-gradient(45deg,var(--deck2) 0 14px,var(--deck) 14px 28px);border:3px solid var(--pc)}
+.front .who{font-family:var(--display);font-size:1.8rem;font-weight:800;word-break:break-word}
+.face.back{background:var(--fg);color:var(--bg);transform:rotateY(180deg);border:3px solid var(--pc)}
+.face.back .q{font-family:var(--display);font-size:1.35rem;font-weight:600;line-height:1.3;text-wrap:balance}
+.face.back.imp{background:var(--accent)}
+.face.back .imp-t{font-family:var(--display);font-size:2rem;font-weight:800}
+.order{display:flex;flex-direction:column;gap:6px;width:100%}
+.order div{padding:10px 12px;border-radius:12px;background:var(--bg);border-left:5px solid var(--pc);font-weight:700;text-align:left}
+.votes{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.votes button{border-bottom:4px solid var(--pc)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spieleabend</a><span class="label" id="roundLbl"></span></div>
+  <div class="board" id="board" hidden></div>
+
+  <section class="scr card" id="scrSetup">
+    <h1>Zahlen-Imposter</h1>
+    <p class="muted">Alle bekommen dieselbe Frage, die man mit einer Zahl beantwortet. Nur der Imposter kennt die Frage nicht und bekommt bloß einen groben Hinweis. Jeder sagt seine Zahl, dann wird diskutiert und abgestimmt.</p>
+    <div id="setup"></div>
+    <div class="hint">Punkte: Imposter erwischt → alle anderen +1. Imposter errät danach noch die Frage → Imposter +2. Imposter nicht erwischt → Imposter +3.</div>
+  </section>
+
+  <section class="scr card center" id="scrPass" hidden>
+    <span class="label">Karte <span id="passNo"></span></span>
+    <div class="flip" id="flip">
+      <div class="inner">
+        <div class="face front" id="front">
+          <span class="label">Nur für</span>
+          <div class="who" id="passName"></div>
+          <p class="muted small">Die anderen schauen weg.</p>
+        </div>
+        <div class="face back" id="back"></div>
+      </div>
+    </div>
+    <button class="primary" id="btnFlip">Karte umdrehen</button>
+  </section>
+
+  <section class="scr card center" id="scrTalk" hidden>
+    <span class="label">Alle kennen ihre Karte</span>
+    <h2>Jetzt sagt jeder seine Zahl</h2>
+    <p class="muted">In dieser Reihenfolge. Danach diskutiert ihr: Wessen Zahl passt nicht?</p>
+    <div class="order" id="order"></div>
+    <button class="primary" id="btnToVote">Abstimmen</button>
+  </section>
+
+  <section class="scr card center" id="scrVote" hidden>
+    <h2>Wen habt ihr gewählt?</h2>
+    <p class="muted small">Zählt gemeinsam auf drei und zeigt auf euren Verdacht. Wer die meisten Stimmen hat, wird hier angetippt.</p>
+    <div class="votes" id="votes"></div>
+  </section>
+
+  <section class="scr card center" id="scrReveal" hidden>
+    <span class="label">Der Imposter war</span>
+    <div class="big" id="rImp"></div>
+    <div class="hint" style="width:100%;text-align:left"><b>Frage:</b> <span id="rQ"></span><br><b>Hinweis des Imposters:</b> <span id="rH"></span></div>
+    <p class="big" id="rRes" style="font-size:1.3rem"></p>
+    <div id="guessBox" class="center" style="display:flex;flex-direction:column;gap:10px;width:100%">
+      <p><b id="gName"></b>, wie lautete die Frage? Sag sie laut.</p>
+      <div class="row" style="width:100%"><button class="okb" id="gYes">Erraten (+2)</button><button class="badb" id="gNo">Daneben</button></div>
+    </div>
+    <button class="primary" id="btnNext">Nächste Runde</button>
+  </section>
+
+  <section class="scr card center" id="scrWin" hidden>
+    <span class="label">Gewonnen</span>
+    <div class="big" id="wName"></div>
+    <div class="rank" id="wRank"></div>
+    <button class="primary" id="btnRematch">Revanche</button>
+    <button class="ghost" id="btnNew">Andere Spieler</button>
+  </section>
+</div>
+
+<script src="../common.js"></script>
+<script src="fragen.js"></script>
+<script>
+const { $, esc, shuffle, show, fresh, board, rank } = SA;
+const G = { players: [], target: 10, round: 0, q: null, imp: 0, idx: 0, start: 0, caught: false };
+
+SA.setup($("setup"), {
+  min: 3, max: 6,
+  extra: `<span class="label">Spiel geht bis</span><div class="seg" id="tgt"><button type="button" data-t="8">8</button><button type="button" data-t="12" class="on">12</button><button type="button" data-t="16">16</button></div>`,
+  onStart(names) {
+    G.players = names.map(n => ({ name: n, score: 0 }));
+    G.target = +document.querySelector("#tgt .on").dataset.t;
+    G.round = 0; newRound();
+  }
+});
+document.querySelectorAll("#tgt button").forEach(b => b.onclick = () => { document.querySelectorAll("#tgt button").forEach(x => x.classList.remove("on")); b.classList.add("on"); });
+
+function drawBoard(active = -1) { board($("board"), G.players, { active }); $("roundLbl").textContent = "Runde " + G.round + " · bis " + G.target; }
+
+function newRound() {
+  G.round++;
+  const [line] = fresh("imposter", FRAGEN, 1);
+  const [q, h] = line.split("|");
+  G.q = q; G.h = h;
+  G.imp = Math.floor(Math.random() * G.players.length);
+  G.start = Math.floor(Math.random() * G.players.length);
+  G.idx = 0; G.caught = false;
+  passTo();
+}
+
+function passTo() {
+  const i = (G.start + G.idx) % G.players.length, p = G.players[i];
+  drawBoard(i);
+  $("flip").classList.remove("open");
+  $("flip").className = "flip pc" + i;
+  $("passNo").textContent = (G.idx + 1) + " von " + G.players.length;
+  $("passName").textContent = p.name;
+  const back = $("back");
+  // Inhalt erst nach dem Zurückdrehen tauschen, damit nichts durchblitzt
+  back.innerHTML = "";
+  back.className = "face back";
+  $("btnFlip").textContent = "Ich bin " + p.name + " – Karte umdrehen";
+  $("btnFlip").dataset.state = "closed";
+  show("scrPass");
+}
+
+$("btnFlip").onclick = () => {
+  const i = (G.start + G.idx) % G.players.length;
+  const back = $("back");
+  if ($("btnFlip").dataset.state === "closed") {
+    if (i === G.imp) {
+      back.className = "face back imp";
+      back.innerHTML = `<span class="imp-t">Du bist der Imposter</span><p>Du kennst die Frage nicht. Hinweis:</p><p class="q">„${esc(G.h)}“</p><p class="small">Sag eine Zahl, die unauffällig wirkt.</p>`;
+    } else {
+      back.innerHTML = `<span class="label" style="color:var(--bg)">Deine Frage</span><p class="q">${esc(G.q)}</p><p class="small">Antworte gleich mit einer Zahl.</p>`;
+    }
+    $("flip").classList.add("open");
+    $("btnFlip").textContent = "Verstanden – Karte verdecken";
+    $("btnFlip").dataset.state = "open";
+  } else {
+    $("flip").classList.remove("open");
+    G.idx++;
+    if (G.idx >= G.players.length) setTimeout(talk, 350);
+    else setTimeout(passTo, 350);
+  }
+};
+
+function talk() {
+  drawBoard();
+  const n = G.players.length;
+  $("order").innerHTML = Array.from({ length: n }, (_, k) => {
+    const i = (G.start + k) % n; return `<div class="pc${i}">${k + 1}. ${esc(G.players[i].name)}</div>`;
+  }).join("");
+  show("scrTalk");
+}
+$("btnToVote").onclick = () => {
+  $("votes").innerHTML = G.players.map((p, i) => `<button class="pc${i}" data-i="${i}">${esc(p.name)}</button>`).join("");
+  $("votes").querySelectorAll("button").forEach(b => b.onclick = () => reveal(+b.dataset.i));
+  show("scrVote");
+};
+
+function reveal(voted) {
+  G.caught = voted === G.imp;
+  const imp = G.players[G.imp];
+  $("rImp").textContent = imp.name;
+  $("rQ").textContent = G.q; $("rH").textContent = G.h;
+  if (G.caught) {
+    G.players.forEach((p, i) => { if (i !== G.imp) p.score += 1; });
+    $("rRes").textContent = "Erwischt! Alle anderen +1";
+    $("rRes").style.color = "var(--ok)";
+    $("gName").textContent = imp.name;
+    $("guessBox").hidden = false; $("btnNext").hidden = true;
+  } else {
+    imp.score += 3;
+    $("rRes").textContent = "Entkommen! " + imp.name + " +3 (ihr habt " + G.players[voted].name + " gewählt)";
+    $("rRes").style.color = "var(--bad)";
+    $("guessBox").hidden = true; $("btnNext").hidden = false;
+  }
+  drawBoard(); show("scrReveal");
+}
+$("gYes").onclick = () => { G.players[G.imp].score += 2; $("rRes").textContent += " · Frage erraten, Imposter +2"; after(); };
+$("gNo").onclick = () => after();
+function after() { $("guessBox").hidden = true; $("btnNext").hidden = false; drawBoard(); }
+
+$("btnNext").onclick = () => {
+  const sc = G.players.map(p => p.score), m = Math.max(...sc);
+  if (m >= G.target && sc.filter(s => s === m).length === 1) {
+    const w = sc.indexOf(m);
+    $("wName").textContent = G.players[w].name;
+    rank($("wRank"), G.players);
+    show("scrWin"); return;
+  }
+  newRound();
+};
+$("btnRematch").onclick = () => { G.players.forEach(p => p.score = 0); G.round = 0; newRound(); };
+$("btnNew").onclick = () => { $("board").hidden = true; $("roundLbl").textContent = ""; show("scrSetup"); };
+</script>
+</body>
+</html>

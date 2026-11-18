@@ -1,0 +1,89 @@
+/* Spieleabend – gemeinsame Basis. Eine Spalte, Handy zuerst, dunkles "Wohnzimmer bei Nacht" mit Spielerfarben */
+:root{
+  --bg:#1c1418; --deck:#2a1f24; --deck2:#35272d; --line:#4a3840;
+  --fg:#f3e6d8; --muted:#b9a596; --accent:#ff5a3c; --tape:#8a5a3c; --ok:#7fd18b; --bad:#ff7a7a;
+  --c0:#FFD12E; --c1:#86D0FF; --c2:#D9BBFF; --c3:#9BE8B0; --c4:#FFB07A; --c5:#FF8FB8;
+  --display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --body:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;touch-action:manipulation}
+html,body{background:var(--bg);color:var(--fg);margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{font-family:var(--body);font-size:16px;line-height:1.45;min-height:100%;-webkit-tap-highlight-color:transparent;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 40px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+[hidden]{display:none!important}
+.wrap{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-weight:800;font-size:1.7rem;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-family:var(--display);font-weight:600;font-size:1.15rem;margin:0;text-wrap:balance}
+p{margin:0}
+.muted{color:var(--muted)} .small{font-size:.875rem}
+.label{font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:700}
+.card{background:var(--deck);border:1px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.center{text-align:center;align-items:center}
+.center > button{align-self:stretch}
+input[type=text],input[type=number],select{width:100%;font:inherit;font-size:1.05rem;padding:13px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row > *{flex:1 1 130px}
+button{font:inherit;font-weight:700;font-size:1rem;border-radius:14px;border:1px solid var(--line);background:var(--deck2);color:var(--fg);padding:14px;min-height:54px;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+button.hot{background:var(--accent);border-color:var(--accent);color:#1c1418}
+button.ghost{background:transparent}
+button.okb{background:var(--ok);border-color:var(--ok);color:#10200f}
+button.badb{background:var(--bad);border-color:var(--bad);color:#2a0d0d}
+.big{font-family:var(--display);font-size:2rem;font-weight:800;word-break:break-word;text-wrap:balance;line-height:1.15}
+.huge{font-family:var(--display);font-size:3.2rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.hint{font-size:.9rem;color:var(--muted);background:var(--bg);border:1px dashed var(--line);border-radius:12px;padding:10px 12px}
+.back{color:var(--muted);text-decoration:none;font-size:.9rem;font-weight:700}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+
+/* Spielerfarben */
+.pc0{--pc:var(--c0)}.pc1{--pc:var(--c1)}.pc2{--pc:var(--c2)}.pc3{--pc:var(--c3)}.pc4{--pc:var(--c4)}.pc5{--pc:var(--c5)}
+.chip{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.chip::before{content:"";width:12px;height:12px;border-radius:50%;background:var(--pc);flex:none}
+
+/* Punktestand */
+.board{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:grid;grid-template-columns:repeat(auto-fit,minmax(74px,1fr));gap:6px;background:var(--bg);padding-block:4px}
+.board .pl{background:var(--deck);border:1px solid var(--line);border-bottom:4px solid var(--pc);border-radius:12px;padding:6px 8px;min-width:0}
+.board .pl.on{background:var(--deck2);border-color:var(--pc)}
+.board .pl.out{opacity:.35}
+.board .n{display:block;font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.board .s{font-family:var(--display);font-size:1.2rem;font-variant-numeric:tabular-nums}
+
+/* Setup */
+.count{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.count button{min-height:48px;padding:6px;font-family:var(--display)}
+.count button.on{background:var(--fg);color:var(--bg)}
+.names{display:flex;flex-direction:column;gap:8px}
+.names .nm{display:grid;grid-template-columns:14px 1fr;gap:10px;align-items:center}
+.names .nm::before{content:"";width:14px;height:14px;border-radius:50%;background:var(--pc)}
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px}
+.seg button{min-height:48px;padding:6px}
+.seg button.on{background:var(--fg);color:var(--bg)}
+
+/* Ergebnisliste */
+.rank{display:flex;flex-direction:column;gap:6px;width:100%}
+.rank .r{display:grid;grid-template-columns:2em 1fr auto;gap:8px;align-items:center;padding:10px 12px;background:var(--bg);border-radius:12px;border-left:5px solid var(--pc);text-align:left}
+.rank .r b:last-child{font-family:var(--display);font-variant-numeric:tabular-nums}
+
+/* Glücksrad */
+.wheelbox{position:relative;width:min(100%,300px);aspect-ratio:1;margin:4px auto}
+.wheelbox svg{width:100%;height:100%;transition:transform 4s cubic-bezier(.13,.67,.12,1)}
+.wheelbox svg text{font:700 12px var(--body);fill:#1c1418}
+.wheelbox .pin{position:absolute;left:50%;top:-8px;margin-left:-13px;border:13px solid transparent;border-top:24px solid var(--fg);z-index:2}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Aufnahme (Rückwärts-Spiele) */
+button.rec{background:var(--accent);border-color:var(--accent);color:#1c1418;font-size:1.1rem}
+button.rec.on{animation:pulse 1s infinite}
+button.play{background:var(--tape);border-color:var(--tape)}
+@keyframes pulse{50%{opacity:.6}}
+canvas.wave{width:100%;height:56px;display:block;border-radius:10px;background:var(--bg)}
+.status{font-size:.9rem;color:var(--muted);min-height:1.3em}
+.step{display:flex;gap:10px;align-items:center}
+.step b{font-family:var(--display);font-size:.8rem;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--tape);color:var(--fg);flex:none}

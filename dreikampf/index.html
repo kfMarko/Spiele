@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Dreikampf Partyquiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans+Extra+Condensed:wght@700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Sportplatz von oben: Tartanbahn als Grund, Kreidelinien als Bahnen, Wertungskarten aus Papier */
+  --tartan:#B4432E; --tartan-tief:#8A2F21; --tartan-hell:#C9573F;
+  --kreide:#FFFDF7; --tinte:#16181B; --grau:#666B72;
+  --rasen:#1C8750; --foul:#C22B24; --band:#FFD12E;
+  --p1:#FFD12E; --p2:#86D0FF; --p3:#D9BBFF;
+  --display:"Sofia Sans Extra Condensed","Avenir Next Condensed","Arial Narrow","Roboto Condensed",sans-serif-condensed,sans-serif;
+  --body:"Sofia Sans","Helvetica Neue",Arial,sans-serif;
+  --hand:"Caveat","Bradley Hand","Segoe Print",cursive;
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%}
+body{
+  font:400 17px/1.4 var(--body);color:var(--kreide);
+  background:var(--tartan) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.38'/%3E%3C/svg%3E");
+  -webkit-tap-highlight-color:transparent;
+}
+button,input{font:inherit;color:inherit}
+button{-webkit-appearance:none;appearance:none;border:0;background:none;cursor:pointer;-webkit-user-select:none;user-select:none}
+:focus-visible{outline:3px solid var(--band);outline-offset:2px}
+
+/* Anzeigetafel: drei Bahnen, Läufer rücken zur Ziellinie vor */
+#board{position:sticky;top:0;z-index:5;background:var(--tartan-tief);border-bottom:3px solid var(--kreide)}
+#board[hidden]{display:none}
+.lane{display:grid;grid-template-columns:26px minmax(0,5.4em) 1fr 2.1em;align-items:center;gap:8px;height:33px;padding:0 12px 0 8px;border-top:2px solid rgba(255,253,247,.8)}
+.lane:first-child{border-top:0}
+.lane.on{background:var(--tartan-hell)}
+.lane .nm{font:700 18px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trk{position:relative;height:100%}
+.trk::before{content:"";position:absolute;left:0;right:12px;top:50%;border-top:2px dashed rgba(255,253,247,.3)}
+.trk::after{content:"";position:absolute;right:0;top:4px;bottom:4px;width:8px;background:conic-gradient(var(--kreide) 25%,var(--tinte) 0 50%,var(--kreide) 0 75%,var(--tinte) 0) 0 0/8px 8px}
+.run{--f:0;position:absolute;top:50%;left:calc(8px + (100% - 24px) * var(--f));width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--pc);border:2px solid var(--tinte);transition:left .7s cubic-bezier(.2,.8,.2,1)}
+.lane .sc{font:900 25px/1 var(--display);text-align:right;font-variant-numeric:tabular-nums}
+.p0{--pc:var(--p1)}.p1{--pc:var(--p2)}.p2{--pc:var(--p3)}.p3{--pc:#9BE8B0}.p4{--pc:#FFB07A}.p5{--pc:#FFFFFF}
+.seg.five{grid-template-columns:repeat(5,1fr)}
+.bib{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 5px 3px;border-radius:4px;background:var(--kreide);color:var(--tinte);font:900 17px/1 var(--display);box-shadow:inset 0 -4px 0 var(--pc);vertical-align:middle}
+.bib.big{min-width:76px;height:84px;font-size:64px;border-radius:10px;box-shadow:inset 0 -12px 0 var(--pc),0 0 0 3px var(--tinte)}
+
+#app{max-width:520px;margin:0 auto;padding:18px 16px 44px;display:flex;flex-direction:column;gap:16px}
+.eyebrow{font:700 16px/1 var(--display);letter-spacing:.14em;text-transform:uppercase}
+.logo{font:900 clamp(56px,24vw,132px)/.84 var(--display);text-transform:uppercase}
+.logo.sm{font-size:clamp(44px,14vw,80px);line-height:.9;overflow-wrap:anywhere;text-wrap:balance}
+.hl{font:900 40px/1 var(--display);text-transform:uppercase;overflow-wrap:anywhere}
+.start,.center{display:flex;flex-direction:column;gap:16px}
+.center{align-items:center;text-align:center}
+.center>.go{align-self:stretch}
+
+/* Startliste: Namen stehen direkt auf den Bahnen */
+.startlist{border-top:3px solid var(--kreide);border-bottom:3px solid var(--kreide)}
+.slane{display:grid;grid-template-columns:44px 1fr;align-items:center;gap:6px;height:62px;border-top:2px solid rgba(255,253,247,.8)}
+.slane:first-child{border-top:0}
+.slane .num{font:900 50px/1 var(--display);text-align:center}
+.slane input{width:100%;height:46px;background:none;border:0;border-bottom:2px dashed rgba(255,253,247,.55);border-radius:0;font:700 30px/1 var(--display);letter-spacing:.03em;text-transform:uppercase;color:var(--kreide);padding:0 4px}
+.slane input::placeholder{color:rgba(255,253,247,.5)}
+.slane input:focus{outline:0;border-bottom:2px solid var(--band)}
+.field{display:grid;gap:8px}
+.lbl{font:700 16px/1 var(--display);letter-spacing:.14em;text-transform:uppercase}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.seg button{display:grid;gap:2px;justify-items:center;min-height:62px;padding:8px 4px;border:2px solid var(--kreide);border-radius:12px;font:900 30px/1 var(--display);font-variant-numeric:tabular-nums}
+.seg small{font:600 13px/1 var(--body);letter-spacing:.02em}
+.seg .on{background:var(--kreide);color:var(--tinte)}
+.fine{font-size:15px;opacity:.9}
+
+.go{display:flex;align-items:center;justify-content:center;width:100%;min-height:62px;padding:12px 18px;border-radius:14px;background:var(--tinte);color:var(--kreide);font:900 25px/1.05 var(--display);letter-spacing:.05em;text-transform:uppercase;box-shadow:0 5px 0 #000;transition:transform .08s,box-shadow .08s}
+.go:active{transform:translateY(4px);box-shadow:0 1px 0 #000}
+.go.w{background:var(--kreide);color:var(--tinte);box-shadow:0 5px 0 var(--tartan-tief)}
+.go.w:active{box-shadow:0 1px 0 var(--tartan-tief)}
+.go.ghost{background:none;color:var(--kreide);box-shadow:none;border:2px solid var(--kreide)}
+.go:disabled{opacity:.45;pointer-events:none}
+
+.wheelbox{position:relative;width:min(100%,330px);aspect-ratio:1;margin:6px auto 2px}
+#wheel{display:block;width:100%;height:100%;transition:transform 4.2s cubic-bezier(.13,.67,.12,1);filter:drop-shadow(0 6px 0 var(--tartan-tief))}
+#wheel text{font:900 17px var(--display);letter-spacing:.05em;text-transform:uppercase}
+.pin{position:absolute;left:50%;top:-10px;z-index:2;margin-left:-15px;border:15px solid transparent;border-top:28px solid var(--band);filter:drop-shadow(0 2px 0 var(--tinte))}
+
+.paper{display:flex;flex-direction:column;gap:14px;padding:16px;border-radius:14px;background:var(--kreide);color:var(--tinte);box-shadow:0 6px 0 var(--tartan-tief)}
+.tagline,.qhead{font:700 15px/1.1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--grau)}
+.qhead{display:flex;justify-content:space-between;gap:12px;padding-bottom:10px;border-bottom:2px solid var(--tinte)}
+.qhead span:last-child{text-align:right}
+.title{font:900 48px/.95 var(--display);text-transform:uppercase}
+.rules{display:grid;gap:8px;padding-left:20px;font-size:18px}
+.turn{font-weight:700;font-size:17px;line-height:1.3}
+.turn.hit{color:var(--rasen)}.turn.miss{color:var(--foul)}
+.qtext{font:700 22px/1.25 var(--body);text-wrap:balance}
+.note{font-size:17px}
+.tapewrap{display:grid;grid-template-columns:1fr 1.6em;align-items:center;gap:10px}
+.tape{position:relative;height:16px;border-radius:3px;background:#E6E1D5;overflow:hidden}
+.tape i{position:absolute;left:0;top:0;bottom:0;width:100%;background:repeating-linear-gradient(90deg,transparent 0 9px,rgba(22,24,27,.6) 9px 10px),var(--band);animation:tape linear forwards}
+@keyframes tape{to{width:0}}
+#secs{font:900 24px/1 var(--display);text-align:right;font-variant-numeric:tabular-nums}
+
+.opts{display:grid;gap:10px}
+.opt{display:grid;grid-template-columns:34px 1fr;align-items:center;gap:12px;width:100%;min-height:58px;padding:9px 12px 9px 9px;text-align:left;border:2px solid var(--tinte);border-radius:12px;background:#fff;color:var(--tinte);font-weight:600;font-size:18px;line-height:1.2;box-shadow:0 3px 0 var(--tinte)}
+.opt i{display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:var(--tinte);color:var(--kreide);font:900 20px/1 var(--display);font-style:normal}
+.opt:active{transform:translateY(3px);box-shadow:none}
+.opt:disabled{pointer-events:none;color:var(--tinte)}
+.opt.ok{background:var(--rasen);color:#fff}
+.opt.gone{opacity:.4;box-shadow:none;text-decoration:line-through}
+.opt.sel{background:var(--band)}
+.whobox{display:grid;gap:10px}
+.whob{min-height:76px;padding:6px;border:3px solid var(--tinte);border-radius:14px;background:var(--pc);color:var(--tinte);font:900 26px/1 var(--display);text-transform:uppercase;overflow-wrap:anywhere;box-shadow:0 4px 0 var(--tinte)}
+.whob:active{transform:translateY(3px);box-shadow:none}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tf{min-height:84px;border:2px solid var(--tinte);border-radius:12px;font:900 30px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;color:#fff;box-shadow:0 4px 0 var(--tinte)}
+.tf.t{background:var(--rasen)}.tf.f{background:var(--foul)}
+.tf:active{transform:translateY(3px);box-shadow:none}
+
+.buzzers{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;position:sticky;bottom:10px}
+.buzz{min-height:92px;padding:6px;border:3px solid var(--tinte);border-radius:16px;background:var(--pc);color:var(--tinte);font:900 23px/1 var(--display);text-transform:uppercase;overflow-wrap:anywhere;box-shadow:0 6px 0 var(--tinte);touch-action:none}
+.buzz.out{opacity:.3;pointer-events:none}
+.buzz.hit{box-shadow:0 0 0 5px var(--kreide)}
+
+.hand-over{display:grid;justify-items:center;gap:12px;padding:6px 0;text-align:center;font-size:19px}
+.numdisp{min-height:58px;padding-bottom:6px;border-bottom:3px solid var(--tinte);text-align:center;font:900 48px/1.1 var(--display);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.numdisp small{font-size:26px}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{min-height:58px;border:2px solid var(--tinte);border-radius:12px;background:#fff;font:900 28px/1 var(--display);box-shadow:0 3px 0 var(--tinte)}
+.pad button:active{transform:translateY(3px);box-shadow:none}
+.pad .okb{background:var(--tinte);color:var(--kreide)}
+.pad .okb:disabled{opacity:.35}
+
+.truth{display:grid;justify-items:center;gap:2px;padding:10px;border:2px dashed var(--tinte);border-radius:12px;text-align:center}
+.truth small{font:700 14px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--grau)}
+.truth b{font:900 44px/1 var(--display);font-variant-numeric:tabular-nums}
+.rows{display:grid}
+.row{display:grid;grid-template-columns:1fr auto 2.6em;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #D9D4C7}
+.row:first-child{border-top:0}
+.rw{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;font-weight:700;overflow-wrap:anywhere}
+.rw small{grid-column:2;font-weight:400;font-size:14px;color:var(--grau)}
+.tot{font:900 27px/1 var(--display);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.plus{font:700 30px/1 var(--hand);color:#1F3FB0;text-align:right;white-space:nowrap}
+.verdict{font-weight:700}
+
+.react{display:grid;place-items:center;width:100%;min-height:340px;border:3px solid var(--tinte);border-radius:18px;font:900 54px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;box-shadow:0 6px 0 var(--tinte);touch-action:none}
+.react.wait{background:var(--tinte);color:var(--kreide)}
+.react.now{background:var(--rasen);color:#fff}
+.clock{text-align:center;font:900 76px/1 var(--display);font-variant-numeric:tabular-nums}
+
+.podium{display:grid;grid-template-columns:repeat(3,1fr);align-items:end;gap:6px;width:100%}
+.step{display:grid;gap:8px;justify-items:center;min-width:0}
+.pn{display:grid;justify-items:center;gap:4px;font:700 18px/1 var(--display);text-transform:uppercase;overflow-wrap:anywhere;text-align:center}
+.blk{display:grid;place-content:center;justify-items:center;width:100%;border-radius:8px 8px 0 0;background:var(--kreide);color:var(--tinte);font:900 48px/1 var(--display);transform-origin:bottom;animation:rise .7s cubic-bezier(.2,.8,.2,1) backwards}
+.blk small{font:700 15px/1 var(--body)}
+.b1{height:150px}.b2{height:114px;animation-delay:.12s}.b3{height:86px;animation-delay:.24s}
+@keyframes rise{from{transform:scaleY(.15)}}
+.urk{align-items:center;text-align:center;border:3px double var(--tinte)}
+.hand{font:700 48px/1 var(--hand);color:#1F3FB0;overflow-wrap:anywhere}
+.fine2{font-size:15px;color:var(--grau)}
+@media (prefers-reduced-motion:reduce){
+  #wheel{transition-duration:.4s}.run{transition:none}.blk{animation:none}
+}
+</style>
+</head>
+<body>
+<a href="../" style="display:block;max-width:520px;margin:0 auto;padding:10px 16px 0;color:#FFFDF7;font:700 15px/1 'Sofia Sans',Arial,sans-serif;text-decoration:none;opacity:.85">← Spieleabend</a>
+<header id="board" hidden></header>
+<main id="app"></main>
+<script>
+const QUIZ={
+allg:[
+"Wie viele Minuten hat ein Tag?|1440|1240|1640|3600",
+"Welches Metall ist bei Raumtemperatur flüssig?|Quecksilber|Blei|Zinn|Aluminium",
+"Wie viele Tasten hat ein Standard-Klavier?|88|76|92|64",
+"Welche Farbe kommt in den olympischen Ringen nicht vor?|Orange|Schwarz|Grün|Gelb",
+"Wie viele Herzen hat ein Oktopus?|3|1|2|4",
+"Welches Tier ziert das Logo von Lamborghini?|Stier|Pferd|Löwe|Jaguar",
+"Aus welchem Land stammt die Automarke Škoda?|Tschechien|Polen|Slowakei|Ungarn",
+"Welche Farbe hat die „Black Box“ eines Flugzeugs?|Orange|Schwarz|Gelb|Silber",
+"Was ist die Hauptzutat von Hummus?|Kichererbsen|Linsen|Weiße Bohnen|Erbsen",
+"Wie viele Ecken hat ein Stoppschild?|8|6|10|4",
+"Welche Zahl liegt beim Würfel der 6 gegenüber?|1|2|3|5",
+"Wer malte die Mona Lisa?|Leonardo da Vinci|Michelangelo|Raffael|Rembrandt",
+"Welches Vitamin bildet der Körper mit Hilfe von Sonnenlicht?|Vitamin D|Vitamin C|Vitamin A|Vitamin B12",
+"In welchem Land wurde „Tetris“ erfunden?|Sowjetunion|Japan|USA|Finnland",
+"Welcher Vogel kann rückwärts fliegen?|Kolibri|Mauersegler|Eisvogel|Spatz",
+"Wie viele Karten hat ein Skatblatt?|32|36|52|24",
+"Welches Land schenkte den USA die Freiheitsstatue?|Frankreich|Großbritannien|Spanien|Niederlande",
+"Welche Einheit misst den elektrischen Widerstand?|Ohm|Volt|Ampere|Watt",
+"Wie heißt der Mutterkonzern von Google?|Alphabet|Meta|Oracle|Amazon",
+"Welches Gewürz ist das teuerste der Welt?|Safran|Vanille|Kardamom|Zimt",
+"Wie viele Sterne hat die Flagge der EU?|12|10|15|27",
+"Welches Pokerblatt ist das höchste?|Royal Flush|Straight Flush|Vierling|Full House",
+"Aus welcher Pflanze wird Tequila gemacht?|Agave|Kaktusfeige|Zuckerrohr|Mais",
+"Wer schrieb „Faust“?|Goethe|Schiller|Lessing|Kafka",
+"Wie viele Knochen hat ein erwachsener Mensch?|206|186|226|256",
+"Welches Sternzeichen hat jemand, der am 1. Januar geboren ist?|Steinbock|Wassermann|Schütze|Fische",
+"Wie viele Nullen hat eine Milliarde?|9|6|8|12",
+"Welche ist die teuerste Straße im deutschen Monopoly?|Schlossallee|Parkstraße|Goethestraße|Opernplatz",
+"Welchem Konzern gehört TikTok?|ByteDance|Tencent|Alibaba|Meta",
+"Was sammelt ein Philatelist?|Briefmarken|Münzen|Schmetterlinge|Bierdeckel",
+"Welcher Planet ist der größte in unserem Sonnensystem?|Jupiter|Saturn|Neptun|Uranus",
+"Wie heißt der kleine Hund von Obelix?|Idefix|Struppi|Rantanplan|Pluto",
+"Welche Spirituose gehört in einen Mojito?|Rum|Wodka|Gin|Tequila",
+"Wofür steht das „W“ in WLAN?|Wireless|Wide|Web|World",
+"Wie hoch ist die reguläre Mehrwertsteuer in Deutschland?|19 %|16 %|21 %|7 %",
+"Welche Blutgruppe gilt als Universalspender?|0 negativ|AB positiv|A negativ|B positiv",
+"Welche Farbe entsteht, wenn man Blau und Gelb mischt?|Grün|Lila|Orange|Braun",
+"Wie viele Saiten hat eine klassische Gitarre?|6|4|5|8",
+"Wie heißt die Währung in Japan?|Yen|Won|Yuan|Baht",
+"Wie viele Figuren hat jeder Spieler zu Beginn einer Schachpartie?|16|12|14|18",
+"Was ist die Hauptzutat von Guacamole?|Avocado|Erbsen|Gurke|Zucchini",
+"Welches Unternehmen baut die PlayStation?|Sony|Nintendo|Microsoft|Sega",
+"Was misst ein Barometer?|Luftdruck|Temperatur|Luftfeuchtigkeit|Windstärke",
+"Welche römische Zahl steht für 50?|L|C|D|X",
+"Welche Sprache hat weltweit die meisten Muttersprachler?|Mandarin|Englisch|Spanisch|Hindi",
+"Wie viele Beine hat eine Spinne?|8|6|10|12",
+"Welche Stadt nennt man „Big Apple“?|New York|Los Angeles|Chicago|Boston",
+"Welches Tier ist im Logo von Lacoste?|Krokodil|Eidechse|Hai|Schlange",
+"Welches Tier ist im Logo von Ferrari?|Pferd|Stier|Löwe|Adler",
+"Wer gründete Amazon?|Jeff Bezos|Elon Musk|Bill Gates|Larry Page",
+"Wie hieß die Plattform X früher?|Twitter|Tumblr|Vine|Myspace",
+"Welche Firma steckt hinter ChatGPT?|OpenAI|Google|Meta|Amazon",
+"Wie viele Farben hat der Regenbogen nach klassischer Zählung?|7|5|6|8",
+"Unter welchem Pseudonym ist der Erfinder von Bitcoin bekannt?|Satoshi Nakamoto|Vitalik Buterin|Hal Finney|John McAfee",
+"Wie viele Felder hat ein Schachbrett?|64|49|81|100",
+"Wie heißt die japanische Kunst des Papierfaltens?|Origami|Ikebana|Bonsai|Kintsugi",
+"Was ist Nori beim Sushi?|Getrocknete Algenblätter|Roher Fisch|Reisessig|Eingelegter Ingwer",
+"Welche Nuss steckt in Marzipan?|Mandel|Haselnuss|Walnuss|Cashew",
+"Aus welcher Stadt stammt die Pizza Margherita?|Neapel|Rom|Mailand|Venedig",
+"Wie viele Bit hat ein Byte?|8|4|16|10",
+"Wofür steht die Abkürzung USB?|Universal Serial Bus|United System Board|Universal Signal Bridge|Unified Serial Block",
+"Welches Tier ist das Wappentier Deutschlands?|Adler|Löwe|Bär|Hirsch",
+"Wie heißt die Schrift für blinde Menschen?|Brailleschrift|Morseschrift|Kurrentschrift|Stenografie",
+"Was feiert Deutschland am 3. Oktober?|Tag der Deutschen Einheit|Reformationstag|Tag der Arbeit|Tag des Grundgesetzes",
+"Wie viele Augen hat ein Würfel insgesamt?|21|18|20|24",
+"Wie viele Tage hat ein Schaltjahr?|366|364|365|367",
+"Wie nennt man die Angst vor Spinnen?|Arachnophobie|Klaustrophobie|Agoraphobie|Akrophobie",
+"Wie heißt die Währung der Schweiz?|Franken|Euro|Krone|Gulden",
+"Welches dieser Wörter ist ein Palindrom?|Rentner|Lehrer|Fahrer|Bauer",
+"Wie heißt das Rentier mit der roten Nase?|Rudolph|Dasher|Comet|Blitzen",
+"Bei welchem Kartenspiel gibt es die Karte „+4“?|UNO|Skip-Bo|Phase 10|Mau-Mau",
+"Wie viele Felder hat ein klassisches Sudoku?|81|64|72|100",
+"Wie viel ist ein Dutzend?|12|10|6|20",
+"Wer erhielt 1886 das Patent auf das erste Automobil?|Carl Benz|Henry Ford|Gottlieb Daimler|Rudolf Diesel",
+"Welche Automarke hat vier Ringe im Logo?|Audi|Opel|BMW|Volvo",
+"In welcher Stadt sitzt Volkswagen?|Wolfsburg|Stuttgart|München|Ingolstadt",
+"In welchem Museum hängt die Mona Lisa?|Louvre|Prado|Uffizien|British Museum",
+"Wer schrieb „Romeo und Julia“?|William Shakespeare|Charles Dickens|Oscar Wilde|Molière",
+"Wer komponierte die „Ode an die Freude“?|Beethoven|Mozart|Bach|Wagner",
+"Welcher Maler schnitt sich ein Stück vom Ohr ab?|Vincent van Gogh|Claude Monet|Salvador Dalí|Pablo Picasso",
+"Welche Zahl folgt in der Reihe 1, 1, 2, 3, 5, 8?|13|11|12|15",
+"Wie viel sind 15 Prozent von 200?|30|15|20|35",
+"Was ist die Wurzel aus 144?|12|14|11|16",
+"Wie viele Kanten hat ein Würfel?|12|8|6|10",
+"Wie viele Gramm hat ein Pfund?|500|250|1000|450",
+"Was misst man in Dezibel?|Lautstärke|Helligkeit|Druck|Geschwindigkeit",
+"Welcher Vogel legt die größten Eier?|Strauß|Emu|Albatros|Kondor",
+"Wie viele Mägen hat eine Kuh?|4|1|2|3",
+"Was sammelt ein Numismatiker?|Münzen|Briefmarken|Käfer|Uhren",
+"Woraus wird Tofu gemacht?|Sojabohnen|Reis|Kichererbsen|Weizen",
+"Was gehört klassisch nicht in eine Carbonara?|Sahne|Ei|Pecorino|Guanciale",
+"Wie heißt japanischer Reiswein?|Sake|Soju|Raki|Ouzo",
+"Welche Frucht trägt ihre Samen außen?|Erdbeere|Himbeere|Kiwi|Feige",
+"Wer gründete Microsoft zusammen mit Paul Allen?|Bill Gates|Steve Jobs|Steve Ballmer|Larry Ellison",
+"Wer gründete Apple zusammen mit Steve Jobs?|Steve Wozniak|Tim Cook|Bill Gates|Jony Ive",
+"In welchem Jahr kam das erste iPhone heraus?|2007|2005|2009|2010",
+"Zu welchem Konzern gehören Instagram und WhatsApp?|Meta|Alphabet|ByteDance|Snap",
+"Welche Programmiersprache heißt wie eine Schlange?|Python|Cobra|Java|Ruby",
+"Welches Tier ist das Maskottchen von Linux?|Pinguin|Fuchs|Elefant|Eule",
+"Welche Farbe hat der deutsche Reisepass?|Bordeauxrot|Dunkelblau|Grün|Schwarz",
+"Wer wählt den Bundeskanzler?|Der Bundestag|Das Volk direkt|Der Bundesrat|Der Bundespräsident",
+"Bei wie vielen Punkten in Flensburg ist der Führerschein weg?|8|10|12|18",
+"Welches Tempo gilt innerorts in Deutschland in der Regel?|50 km/h|30 km/h|60 km/h|70 km/h",
+"Was bedeutet „Carpe diem“?|Nutze den Tag|Erkenne dich selbst|Ich kam, sah und siegte|Die Zeit vergeht",
+"Was heißt „Danke“ auf Spanisch?|Gracias|Grazie|Merci|Obrigado",
+"Wie heißt die Band von Freddie Mercury?|Queen|Genesis|The Who|Kiss",
+"Wen nennt man den „King of Pop“?|Michael Jackson|Elvis Presley|Prince|Justin Timberlake",
+"Wie heißt das chemische Symbol für Gold?|Au|Ag|Go|Gd",
+"Wie lautet die chemische Formel von Wasser?|H2O|CO2|O2|NaCl",
+"Welches Gas macht den größten Teil der Luft aus?|Stickstoff|Sauerstoff|Kohlendioxid|Wasserstoff",
+"Welcher Planet heißt auch der Rote Planet?|Mars|Venus|Merkur|Saturn",
+"Wie lange braucht das Licht von der Sonne zur Erde?|Etwa 8 Minuten|Etwa 8 Sekunden|Etwa 8 Stunden|Etwa 8 Tage",
+"Welches ist das schnellste Landtier?|Gepard|Löwe|Antilope|Windhund",
+"Welches ist das größte Tier der Erde?|Blauwal|Afrikanischer Elefant|Pottwal|Riesenkalmar",
+"Was fressen Koalas fast ausschließlich?|Eukalyptus|Bambus|Akazien|Farn",
+"In welchem Jahr fiel die Berliner Mauer?|1989|1987|1990|1991",
+"Wer war der erste Bundeskanzler der Bundesrepublik?|Konrad Adenauer|Willy Brandt|Ludwig Erhard|Helmut Schmidt",
+"In welchem Jahr landeten die ersten Menschen auf dem Mond?|1969|1965|1972|1959",
+"Wer betrat als erster Mensch den Mond?|Neil Armstrong|Buzz Aldrin|Juri Gagarin|John Glenn",
+"In welchem Jahr begann die Französische Revolution?|1789|1776|1815|1848",
+"Wer erfand in Europa den Buchdruck mit beweglichen Lettern?|Johannes Gutenberg|Martin Luther|Albrecht Dürer|Leonardo da Vinci",
+"In welchem Jahr begann der Erste Weltkrieg?|1914|1918|1912|1939",
+"Welche Stadt wurde im Jahr 79 vom Vesuv verschüttet?|Pompeji|Rom|Neapel|Syrakus",
+"Wer war der erste Mensch im Weltall?|Juri Gagarin|Neil Armstrong|Alan Shepard|John Glenn",
+"Welche Farbe hat ein Smaragd?|Grün|Rot|Blau|Gelb",
+"Welche Seite eines Schiffs ist Backbord?|Links|Rechts|Vorne|Hinten",
+"Wofür steht „PS“ beim Auto?|Pferdestärke|Power Speed|Pro Sekunde|Pleuelstange",
+"Was ist ein Sommelier?|Ein Weinexperte|Ein Käsemeister|Ein Brotbäcker|Ein Barkeeper",
+"Wie nennt man ein junges Pferd?|Fohlen|Kalb|Kitz|Welpe",
+"Was erfand Alfred Nobel?|Dynamit|Glühbirne|Telefon|Dampfmaschine",
+"Welches Element hat das chemische Symbol O?|Sauerstoff|Gold|Osmium|Zinn",
+"Wie viele Planeten hat unser Sonnensystem?|8|7|9|10",
+"Welcher Planet hat die auffälligsten Ringe?|Saturn|Jupiter|Uranus|Mars",
+"Wie heißt unsere Galaxie?|Milchstraße|Andromeda|Orion|Kassiopeia",
+"Was geben Pflanzen bei der Photosynthese ab?|Sauerstoff|Stickstoff|Kohlendioxid|Helium",
+"Welches dieser Tiere ist ein Säugetier?|Delfin|Hai|Pinguin|Krokodil"
+],
+geo:[
+"Wie heißt die Hauptstadt von Australien?|Canberra|Sydney|Melbourne|Perth",
+"Wie heißt die Hauptstadt von Kanada?|Ottawa|Toronto|Vancouver|Montreal",
+"Wie heißt die Hauptstadt der Türkei?|Ankara|Istanbul|Izmir|Antalya",
+"Welcher ist der höchste Berg Deutschlands?|Zugspitze|Watzmann|Feldberg|Brocken",
+"Welches Land hat die größte Fläche der Erde?|Russland|Kanada|China|USA",
+"Wie viele Nachbarländer hat Deutschland?|9|7|8|10",
+"Welche Stadt liegt auf zwei Kontinenten?|Istanbul|Kairo|Moskau|Athen",
+"Wie heißt die Hauptstadt der Schweiz?|Bern|Zürich|Genf|Basel",
+"In welchem Land liegt Machu Picchu?|Peru|Mexiko|Bolivien|Chile",
+"Welcher ist der wasserreichste Fluss der Erde?|Amazonas|Nil|Kongo|Mississippi",
+"Welches Bundesland ist flächenmäßig das größte?|Bayern|Niedersachsen|Baden-Württemberg|Nordrhein-Westfalen",
+"Wie heißt die größte Insel der Erde?|Grönland|Madagaskar|Borneo|Neuguinea",
+"Welche Nationalflagge ist nicht viereckig?|Nepal|Bhutan|Sri Lanka|Katar",
+"Zu welchem Land gehört Grönland?|Dänemark|Norwegen|Island|Kanada",
+"Wie heißt die Hauptstadt von Brasilien?|Brasília|Rio de Janeiro|São Paulo|Salvador",
+"Welcher Ozean ist der größte?|Pazifik|Atlantik|Indischer Ozean|Arktischer Ozean",
+"An welchem Fluss liegt Köln?|Rhein|Main|Elbe|Mosel",
+"Wie heißt der höchste Berg Afrikas?|Kilimandscharo|Mount Kenya|Tafelberg|Mount Meru",
+"In welchem Land steht Angkor Wat?|Kambodscha|Thailand|Vietnam|Laos",
+"Welches ist das kleinste Bundesland Deutschlands?|Bremen|Saarland|Hamburg|Berlin",
+"Welche Meerenge trennt Spanien von Marokko?|Straße von Gibraltar|Bosporus|Ärmelkanal|Straße von Messina",
+"Wie heißt die Hauptstadt von Neuseeland?|Wellington|Auckland|Christchurch|Queenstown",
+"Welcher See ist der tiefste der Erde?|Baikalsee|Titicacasee|Viktoriasee|Bodensee",
+"Zu welchem Land gehört die Insel Sardinien?|Italien|Frankreich|Spanien|Griechenland",
+"Wie heißt die Landeshauptstadt von Hessen?|Wiesbaden|Frankfurt am Main|Kassel|Darmstadt",
+"In welches Meer mündet die Donau?|Schwarzes Meer|Mittelmeer|Adria|Kaspisches Meer",
+"Welcher US-Bundesstaat ist flächenmäßig der größte?|Alaska|Texas|Kalifornien|Montana",
+"Wie heißt die Hauptstadt von Marokko?|Rabat|Casablanca|Marrakesch|Tanger",
+"In welchem Land liegt die Felsenstadt Petra?|Jordanien|Ägypten|Syrien|Saudi-Arabien",
+"Wie heißt die größte Insel Deutschlands?|Rügen|Sylt|Usedom|Fehmarn",
+"Welches Land hat seit 2023 die meisten Einwohner der Welt?|Indien|China|USA|Indonesien",
+"Wie heißt der höchste Berg Südamerikas?|Aconcagua|Chimborazo|Cotopaxi|Illimani",
+"Welcher Kanal verbindet Mittelmeer und Rotes Meer?|Suezkanal|Panamakanal|Kanal von Korinth|Nord-Ostsee-Kanal",
+"Wie heißt die Hauptstadt von Vietnam?|Hanoi|Ho-Chi-Minh-Stadt|Da Nang|Hue",
+"Welches EU-Land ist flächenmäßig das kleinste?|Malta|Luxemburg|Zypern|Slowenien",
+"In welchem Land liegen die Victoriafälle neben Sambia?|Simbabwe|Kenia|Tansania|Südafrika",
+"Wie heißt die Hauptstadt von Portugal?|Lissabon|Porto|Faro|Coimbra",
+"Wie heißt die Hauptstadt von Polen?|Warschau|Krakau|Danzig|Breslau",
+"Wie heißt die Hauptstadt von Norwegen?|Oslo|Bergen|Stockholm|Helsinki",
+"Wie heißt die Hauptstadt von Finnland?|Helsinki|Oslo|Tallinn|Turku",
+"Wie heißt die Hauptstadt von Ungarn?|Budapest|Bukarest|Belgrad|Prag",
+"Wie heißt die Hauptstadt von Rumänien?|Bukarest|Budapest|Sofia|Belgrad",
+"Wie heißt die Hauptstadt von Kroatien?|Zagreb|Split|Dubrovnik|Ljubljana",
+"Wie heißt die Hauptstadt von Indien?|Neu-Delhi|Mumbai|Kalkutta|Bangalore",
+"Wie heißt die Hauptstadt von Südkorea?|Seoul|Busan|Pjöngjang|Incheon",
+"Wie heißt die Hauptstadt von Thailand?|Bangkok|Phuket|Chiang Mai|Pattaya",
+"Wie heißt die Hauptstadt von Argentinien?|Buenos Aires|Santiago|Montevideo|Lima",
+"Wie heißt die Hauptstadt von Ägypten?|Kairo|Alexandria|Luxor|Gizeh",
+"Wie heißt die Hauptstadt von Kenia?|Nairobi|Mombasa|Kampala|Daressalam",
+"Wie heißt die Hauptstadt von Peru?|Lima|Cusco|Quito|La Paz",
+"Wie heißt die Hauptstadt von Kolumbien?|Bogotá|Medellín|Cali|Caracas",
+"Wie heißt die Hauptstadt der USA?|Washington, D.C.|New York|Los Angeles|Chicago",
+"Wie heißt die Hauptstadt von Irland?|Dublin|Belfast|Cork|Edinburgh",
+"Wie heißt die Hauptstadt von Schottland?|Edinburgh|Glasgow|Aberdeen|Dublin",
+"Wie heißt die Hauptstadt von Island?|Reykjavík|Oslo|Nuuk|Tórshavn",
+"Wie heißt die Hauptstadt von Dänemark?|Kopenhagen|Aarhus|Stockholm|Malmö",
+"Wie heißt die Hauptstadt von Tschechien?|Prag|Brünn|Bratislava|Pilsen",
+"Wie heißt die Hauptstadt der Slowakei?|Bratislava|Ljubljana|Prag|Košice",
+"Wie heißt die Hauptstadt von Bulgarien?|Sofia|Varna|Bukarest|Skopje",
+"Wie heißt die Hauptstadt von Serbien?|Belgrad|Zagreb|Sarajevo|Novi Sad",
+"Wie heißt die Hauptstadt von Kuba?|Havanna|Santiago de Cuba|Kingston|San Juan",
+"Wie heißt die Hauptstadt von Saudi-Arabien?|Riad|Mekka|Dschidda|Dubai",
+"Wie heißt die Hauptstadt der Vereinigten Arabischen Emirate?|Abu Dhabi|Dubai|Doha|Maskat",
+"Wie heißt die Hauptstadt von China?|Peking|Shanghai|Hongkong|Shenzhen",
+"Wie heißt die Hauptstadt der Niederlande?|Amsterdam|Den Haag|Rotterdam|Utrecht",
+"Wie heißt die Hauptstadt von Nigeria?|Abuja|Lagos|Accra|Kano",
+"Wie heißt die Hauptstadt von Pakistan?|Islamabad|Karatschi|Lahore|Kabul",
+"Wie heißt die Hauptstadt von Schweden?|Stockholm|Göteborg|Malmö|Oslo",
+"Wie heißt die Hauptstadt von Belgien?|Brüssel|Antwerpen|Brügge|Luxemburg",
+"Wie heißt die Hauptstadt der Ukraine?|Kiew|Lwiw|Odessa|Minsk",
+"Wie heißt die Hauptstadt von Mexiko?|Mexiko-Stadt|Cancún|Guadalajara|Tijuana",
+"Wie heißt die Landeshauptstadt von Nordrhein-Westfalen?|Düsseldorf|Köln|Dortmund|Essen",
+"Wie heißt die Landeshauptstadt von Niedersachsen?|Hannover|Braunschweig|Bremen|Osnabrück",
+"Wie heißt die Landeshauptstadt von Sachsen?|Dresden|Leipzig|Chemnitz|Magdeburg",
+"Wie heißt die Landeshauptstadt von Schleswig-Holstein?|Kiel|Lübeck|Flensburg|Hamburg",
+"Wie heißt die Landeshauptstadt von Rheinland-Pfalz?|Mainz|Koblenz|Trier|Kaiserslautern",
+"Wie heißt die Landeshauptstadt von Thüringen?|Erfurt|Jena|Weimar|Gera",
+"Wie heißt die Landeshauptstadt von Sachsen-Anhalt?|Magdeburg|Halle|Dessau|Dresden",
+"Wie heißt die Landeshauptstadt von Brandenburg?|Potsdam|Cottbus|Berlin|Frankfurt (Oder)",
+"Wie heißt die Landeshauptstadt von Mecklenburg-Vorpommern?|Schwerin|Rostock|Stralsund|Greifswald",
+"Wie heißt die Landeshauptstadt von Baden-Württemberg?|Stuttgart|Karlsruhe|Mannheim|Freiburg",
+"Wie heißt die Landeshauptstadt des Saarlands?|Saarbrücken|Trier|Saarlouis|Neunkirchen",
+"Welches Bundesland hat die meisten Einwohner?|Nordrhein-Westfalen|Bayern|Baden-Württemberg|Niedersachsen",
+"Welches Land ist kein Nachbar Deutschlands?|Italien|Dänemark|Tschechien|Luxemburg",
+"Welche drei Länder grenzen an den Bodensee?|Deutschland, Österreich, Schweiz|Deutschland, Schweiz, Frankreich|Deutschland, Österreich, Italien|Schweiz, Österreich, Liechtenstein",
+"Welcher Fluss fließt durch Hamburg?|Elbe|Weser|Rhein|Oder",
+"Welche ist die zweitgrößte Stadt Deutschlands?|Hamburg|München|Köln|Frankfurt am Main",
+"Welcher ist der höchste Berg der Erde?|Mount Everest|K2|Kilimandscharo|Mont Blanc",
+"Welcher ist der höchste Berg der Alpen?|Mont Blanc|Matterhorn|Großglockner|Zugspitze",
+"Wie heißt die größte heiße Wüste der Erde?|Sahara|Gobi|Kalahari|Atacama",
+"Wie heißt der kleinste Staat der Welt?|Vatikanstadt|Monaco|San Marino|Liechtenstein",
+"In welchem Land liegt der Berg Fuji?|Japan|China|Südkorea|Nepal",
+"In welchem Land steht das Taj Mahal?|Indien|Pakistan|Iran|Bangladesch",
+"In welcher Stadt steht die Sagrada Família?|Barcelona|Madrid|Sevilla|Lissabon",
+"In welcher Stadt steht das Kolosseum?|Rom|Athen|Neapel|Istanbul",
+"In welcher Stadt steht die Christusstatue Cristo Redentor?|Rio de Janeiro|São Paulo|Lissabon|Buenos Aires",
+"In welcher Stadt steht das Burj Khalifa?|Dubai|Abu Dhabi|Doha|Riad",
+"Zwischen welchen zwei Ländern liegen die Niagarafälle?|USA und Kanada|USA und Mexiko|Kanada und Grönland|Brasilien und Argentinien",
+"In welchem US-Bundesstaat liegt der Grand Canyon?|Arizona|Nevada|Utah|Colorado",
+"In welchem Land liegt der Uluru?|Australien|Neuseeland|Südafrika|Namibia",
+"Welche Sprache spricht man in Brasilien?|Portugiesisch|Spanisch|Italienisch|Französisch",
+"Wie viele Bundesstaaten haben die USA?|50|48|51|52",
+"Wie heißt die Hauptstadt von Kalifornien?|Sacramento|Los Angeles|San Francisco|San Diego",
+"In welchem US-Bundesstaat liegt Las Vegas?|Nevada|Kalifornien|Arizona|Texas",
+"Wie viele Mitgliedstaaten hat die EU?|27|25|28|30",
+"Welcher ist der längste Fluss Europas?|Wolga|Donau|Rhein|Dnepr",
+"In welchem Land entspringt der Rhein?|Schweiz|Deutschland|Österreich|Frankreich",
+"Zu welchem Land gehört Kreta?|Griechenland|Türkei|Italien|Zypern",
+"Zu welchem Land gehört Korsika?|Frankreich|Italien|Spanien|Monaco",
+"Zu welchem Land gehört Madeira?|Portugal|Spanien|Marokko|Italien",
+"Zu welcher Inselgruppe gehört Teneriffa?|Kanaren|Balearen|Azoren|Kykladen",
+"Zu welcher Inselgruppe gehört Mallorca?|Balearen|Kanaren|Azoren|Kykladen",
+"Welche zwei Länder liegen auf der Iberischen Halbinsel?|Spanien und Portugal|Italien und Malta|Spanien und Frankreich|Griechenland und Albanien",
+"In welchem Land liegt Transsilvanien?|Rumänien|Ungarn|Bulgarien|Serbien",
+"Welches Land ist für seine Fjorde bekannt?|Norwegen|Dänemark|Finnland|Polen",
+"Wie heißt die größte Stadt Australiens?|Sydney|Melbourne|Canberra|Brisbane",
+"Wie heißt die größte Stadt Brasiliens?|São Paulo|Rio de Janeiro|Brasília|Salvador",
+"Wie heißt die größte Stadt der Schweiz?|Zürich|Bern|Genf|Basel",
+"Welches Meer liegt zwischen Italien und Kroatien?|Adria|Ägäis|Tyrrhenisches Meer|Schwarzes Meer",
+"In welchem Meer geht man wegen des vielen Salzes nicht unter?|Totes Meer|Rotes Meer|Schwarzes Meer|Kaspisches Meer",
+"Welcher Kanal verbindet Atlantik und Pazifik?|Panamakanal|Suezkanal|Ärmelkanal|Nord-Ostsee-Kanal",
+"Welche Meerenge liegt zwischen England und Frankreich?|Ärmelkanal|Bosporus|Öresund|Straße von Gibraltar",
+"Welcher Fluss fließt durch Paris?|Seine|Loire|Rhône|Themse",
+"Welcher Fluss fließt durch London?|Themse|Seine|Severn|Tyne",
+"Welcher Fluss fließt durch Wien und Budapest?|Donau|Elbe|Moldau|Theiß",
+"Welcher Fluss fließt durch Rom?|Tiber|Po|Arno|Etsch",
+"Welcher Fluss fließt durch Kairo?|Nil|Euphrat|Kongo|Jordan",
+"Wie heißt das Gebirge zwischen Spanien und Frankreich?|Pyrenäen|Alpen|Apennin|Karpaten",
+"In welchem Gebirge liegt der Mount Everest?|Himalaya|Anden|Karakorum|Kaukasus",
+"Wie heißt das längste Gebirge der Erde über Wasser?|Anden|Himalaya|Rocky Mountains|Alpen",
+"In welchem Land liegt der größte Teil des Amazonas-Regenwalds?|Brasilien|Peru|Kolumbien|Venezuela",
+"Vor welchem Land liegt das Great Barrier Reef?|Australien|Indonesien|Philippinen|Mexiko",
+"Welche Währung hat Großbritannien?|Pfund Sterling|Euro|Dollar|Krone",
+"Welche Währung hat Polen?|Złoty|Euro|Krone|Forint",
+"Welches Land ist das größte in Südamerika?|Brasilien|Argentinien|Peru|Kolumbien",
+"Welches Land ist flächenmäßig das größte in Afrika?|Algerien|Sudan|Ägypten|Libyen",
+"Welche Stadt nennt man die „Ewige Stadt“?|Rom|Athen|Jerusalem|Paris"
+],
+sport:[
+"Wer wurde 2014 Fußball-Weltmeister?|Deutschland|Argentinien|Brasilien|Spanien",
+"Welches Land wurde 2004 überraschend Fußball-Europameister?|Griechenland|Portugal|Tschechien|Dänemark",
+"Wie lang ist ein Marathon?|42,195 km|40 km|45 km|38,5 km",
+"Wie viele Spieler stehen beim Handball pro Team auf dem Feld?|7|6|5|8",
+"Was ist die höchste Punktzahl mit drei Darts?|180|150|170|200",
+"Aus welchem Land kommt Usain Bolt?|Jamaika|USA|Kenia|Bahamas",
+"Auf welchem Belag wird in Wimbledon gespielt?|Rasen|Sand|Hartplatz|Teppich",
+"Für welches Team spielte Michael Jordan seine größten Jahre?|Chicago Bulls|Los Angeles Lakers|Boston Celtics|Miami Heat",
+"Wie viele Punkte zählt ein Touchdown im American Football?|6|3|5|7",
+"Wie hoch hängt ein Basketballkorb?|3,05 m|2,80 m|3,20 m|3,50 m",
+"Welches Land gewann die Fußball-WM 2022 in Katar?|Argentinien|Frankreich|Kroatien|Marokko",
+"Wie oft wurde Michael Schumacher Formel-1-Weltmeister?|7|5|6|8",
+"Welche Farbe hat das Trikot des Gesamtführenden bei der Tour de France?|Gelb|Grün|Rot|Weiß",
+"Wie viele Löcher hat eine komplette Golfrunde?|18|9|12|21",
+"Mit welchem NBA-Team wurde Dirk Nowitzki 2011 Meister?|Dallas Mavericks|San Antonio Spurs|Houston Rockets|Phoenix Suns",
+"Wie lautet das höchste Break beim Snooker?|147|155|180|121",
+"Wie endete das WM-Halbfinale Deutschland gegen Brasilien 2014?|7:1|5:0|4:1|6:2",
+"Wie viele Spieler hat ein Volleyballteam auf dem Feld?|6|5|7|8",
+"In welcher Stadt fanden die Olympischen Sommerspiele 2024 statt?|Paris|Tokio|London|Los Angeles",
+"Wer schoss 2014 das Siegtor im WM-Finale?|Mario Götze|Thomas Müller|Miroslav Klose|André Schürrle",
+"Wie alt war Boris Becker bei seinem ersten Wimbledon-Sieg?|17|16|18|19",
+"Wie heißt das Finale der NFL?|Super Bowl|World Series|Stanley Cup|Pro Bowl",
+"Wie viele Drittel hat ein Eishockeyspiel?|3|2|4|5",
+"Wie breit ist ein Fußballtor?|7,32 m|6,50 m|7,00 m|8,10 m",
+"Welcher Verein wurde 2024 ungeschlagen Deutscher Meister?|Bayer Leverkusen|FC Bayern|Borussia Dortmund|RB Leipzig",
+"Wer hat die meisten Olympia-Goldmedaillen gewonnen?|Michael Phelps|Usain Bolt|Carl Lewis|Simone Biles",
+"Wie heißt beim Golf ein Schlag unter Par?|Birdie|Bogey|Eagle|Albatros",
+"In welcher Stadt steht das Stadion „Old Trafford“?|Manchester|Liverpool|London|Birmingham",
+"Bis zu wie vielen Punkten geht ein Satz im Tischtennis?|11|15|21|9",
+"Wer gewann die Fußball-EM 2024 in Deutschland?|Spanien|England|Frankreich|Deutschland",
+"Wie hieß Boxlegende Muhammad Ali bei seiner Geburt?|Cassius Clay|Joe Frazier|George Foreman|Sonny Liston",
+"In welchem Land liegt die Skisprungschanze von Bischofshofen?|Österreich|Deutschland|Schweiz|Slowenien",
+"Wie viele Super Bowls gewann Tom Brady?|7|5|6|8",
+"Welche Sportart betreibt Magnus Carlsen?|Schach|Skispringen|Biathlon|Handball",
+"Wie viele Spieler hat ein Basketballteam auf dem Feld?|5|4|6|7",
+"In welchem Land fand die Fußball-WM 2010 statt?|Südafrika|Brasilien|Deutschland|Russland",
+"In welchem Land fand die Fußball-WM 2006 statt?|Deutschland|Frankreich|Italien|Südafrika",
+"Wer wurde 2006 Fußball-Weltmeister?|Italien|Frankreich|Deutschland|Brasilien",
+"Wer wurde 2018 Fußball-Weltmeister?|Frankreich|Kroatien|Belgien|England",
+"Wer wurde 2010 Fußball-Weltmeister?|Spanien|Niederlande|Deutschland|Uruguay",
+"Welche Länder richteten die Fußball-WM 2026 aus?|USA, Kanada und Mexiko|USA und Kanada|Mexiko und Brasilien|Spanien und Portugal",
+"Wer gewann die Fußball-EM 2016?|Portugal|Frankreich|Deutschland|Wales",
+"Wer gewann die Fußball-EM 2021?|Italien|England|Spanien|Dänemark",
+"Wie nennt man den deutschen WM-Sieg von 1954?|Das Wunder von Bern|Das Sommermärchen|Die Schmach von Córdoba|Die Nacht von Sevilla",
+"Wer war Bundestrainer beim WM-Titel 2014?|Joachim Löw|Jürgen Klinsmann|Hansi Flick|Rudi Völler",
+"Wer war 2014 Kapitän der deutschen Weltmeister?|Philipp Lahm|Bastian Schweinsteiger|Manuel Neuer|Per Mertesacker",
+"Welchen Spitznamen trug Franz Beckenbauer?|Der Kaiser|Der Bomber|Der Titan|Der Terrier",
+"Wen nannte man den „Bomber der Nation“?|Gerd Müller|Uwe Seeler|Rudi Völler|Jürgen Klinsmann",
+"Wer ist deutscher Rekordnationalspieler?|Lothar Matthäus|Miroslav Klose|Lukas Podolski|Thomas Müller",
+"Welcher Verein ist deutscher Rekordmeister?|FC Bayern München|Borussia Dortmund|Hamburger SV|Borussia Mönchengladbach",
+"In welcher Stadt spielt Schalke 04?|Gelsenkirchen|Dortmund|Bochum|Essen",
+"In welcher Stadt findet das DFB-Pokalfinale statt?|Berlin|München|Frankfurt|Dortmund",
+"Für welches Land spielt Lionel Messi?|Argentinien|Spanien|Brasilien|Uruguay",
+"Für welches Land spielt Cristiano Ronaldo?|Portugal|Spanien|Brasilien|Italien",
+"Für welches Land spielt Erling Haaland?|Norwegen|Schweden|Dänemark|Niederlande",
+"Für welches Land spielt Kylian Mbappé?|Frankreich|Belgien|Kamerun|Schweiz",
+"Aus welchem Land kommt Robert Lewandowski?|Polen|Tschechien|Kroatien|Ungarn",
+"Wem gelangen 2015 fünf Tore in neun Minuten?|Robert Lewandowski|Thomas Müller|Pierre-Emerick Aubameyang|Arjen Robben",
+"Welcher Verein hat die Champions League am häufigsten gewonnen?|Real Madrid|AC Mailand|FC Bayern|FC Liverpool",
+"Wer gewann den Ballon d’Or am häufigsten?|Lionel Messi|Cristiano Ronaldo|Michel Platini|Johan Cruyff",
+"Gegen welches Land traf Maradona 1986 mit der „Hand Gottes“?|England|Deutschland|Belgien|Italien",
+"Wen stieß Zinédine Zidane im WM-Finale 2006 mit dem Kopf um?|Marco Materazzi|Fabio Cannavaro|Gennaro Gattuso|Gianluigi Buffon",
+"In welchem Stadion spielt der FC Liverpool?|Anfield|Old Trafford|Stamford Bridge|Emirates Stadium",
+"Welcher Verein spielt im Santiago Bernabéu?|Real Madrid|FC Barcelona|Atlético Madrid|FC Sevilla",
+"Wie weit ist der Elfmeterpunkt vom Tor entfernt?|11 Meter|9 Meter|12 Meter|16 Meter",
+"In welchem Abstand finden Olympische Sommerspiele statt?|Alle 4 Jahre|Alle 2 Jahre|Alle 3 Jahre|Alle 5 Jahre",
+"In welcher Stadt fanden die Olympischen Sommerspiele 2012 statt?|London|Peking|Athen|Rio de Janeiro",
+"In welcher Stadt fanden die Olympischen Sommerspiele 2016 statt?|Rio de Janeiro|London|Tokio|Sydney",
+"In welcher Stadt finden die Olympischen Sommerspiele 2028 statt?|Los Angeles|Brisbane|Rom|Madrid",
+"In welcher Stadt fanden 1896 die ersten Olympischen Spiele der Neuzeit statt?|Athen|Paris|Rom|London",
+"Wer hält den 100-Meter-Weltrekord von 9,58 Sekunden?|Usain Bolt|Tyson Gay|Carl Lewis|Justin Gatlin",
+"Aus welchen Sportarten besteht ein Triathlon?|Schwimmen, Radfahren, Laufen|Laufen, Springen, Werfen|Schwimmen, Laufen, Schießen|Radfahren, Rudern, Laufen",
+"Welche zwei Sportarten verbindet Biathlon?|Skilanglauf und Schießen|Skispringen und Langlauf|Abfahrt und Slalom|Eisschnelllauf und Schießen",
+"Welches Grand-Slam-Turnier wird auf Sand gespielt?|French Open|Wimbledon|US Open|Australian Open",
+"Was bedeutet „Love“ beim Tennis?|Null Punkte|Ein Ass|Einstand|Satzball",
+"Aus welchem Land kommt Roger Federer?|Schweiz|Österreich|Schweden|Deutschland",
+"Aus welchem Land kommt Novak Đoković?|Serbien|Kroatien|Slowenien|Bulgarien",
+"Welcher Tennisspieler gewann die French Open 14 Mal?|Rafael Nadal|Roger Federer|Björn Borg|Novak Đoković",
+"Welche Deutsche gewann 1988 den Golden Slam im Tennis?|Steffi Graf|Anke Huber|Angelique Kerber|Sabine Lisicki",
+"Welche Rückennummer machte Michael Jordan berühmt?|23|32|8|33",
+"Für welches Team spielte Kobe Bryant seine ganze NBA-Karriere?|Los Angeles Lakers|Chicago Bulls|Boston Celtics|New York Knicks",
+"Welches Land wurde 2023 Basketball-Weltmeister?|Deutschland|USA|Serbien|Spanien",
+"Wie viele Punkte zählt ein Field Goal im American Football?|3|1|2|6",
+"Wie viele Teams spielen in der NFL?|32|30|28|36",
+"Wie heißt die Trophäe der NHL?|Stanley Cup|Vince Lombardi Trophy|Larry O’Brien Trophy|Davis Cup",
+"In welcher Sportart gibt es ein Hole-in-one?|Golf|Billard|Bowling|Darts",
+"Mit welchem Team wurde Sebastian Vettel viermal Weltmeister?|Red Bull|Ferrari|Mercedes|McLaren",
+"Aus welchem Land kommt Max Verstappen?|Niederlande|Belgien|Deutschland|Dänemark",
+"Wie wird die Nordschleife des Nürburgrings genannt?|Grüne Hölle|Rote Wand|Schwarze Acht|Weiße Hölle",
+"In welchem Fürstentum fährt die Formel 1 durch die Straßen der Stadt?|Monaco|Liechtenstein|Andorra|Luxemburg",
+"Wem biss Mike Tyson 1997 ein Stück vom Ohr ab?|Evander Holyfield|Lennox Lewis|Muhammad Ali|George Foreman",
+"Aus welchem Land kommen die Klitschko-Brüder?|Ukraine|Russland|Polen|Kasachstan",
+"Wie viele Punkte ist das Bullseye beim Darts wert?|50|25|60|100",
+"Wie viele Punkte ist die schwarze Kugel beim Snooker wert?|7|5|8|10",
+"Wie viele Schwimmstile gibt es bei Olympia?|4|3|5|6",
+"Wie heißt die Hochsprung-Technik, bei der man rückwärts über die Latte geht?|Fosbury-Flop|Scherensprung|Straddle|Rollsprung",
+"In welcher Sportart gibt es einen Slam Dunk?|Basketball|Volleyball|Handball|Tennis",
+"In welcher Sportart gibt es „Strike“ und „Spare“?|Bowling|Baseball|Darts|Golf",
+"In welcher Sportart kämpft man im Oktagon?|Mixed Martial Arts|Boxen|Ringen|Judo",
+"Welche Gürtelfarbe trägt ein Meister im Judo?|Schwarz|Braun|Rot|Blau",
+"Aus welchem Land stammt Sumo?|Japan|China|Mongolei|Südkorea",
+"Welches Land gilt als Mutterland des Fußballs?|England|Brasilien|Italien|Deutschland",
+"Wie viele Spieler hat ein Rugby-Union-Team auf dem Feld?|15|11|13|9",
+"Wie viele Spieler hat ein Eishockeyteam mit Torwart auf dem Eis?|6|5|7|11",
+"Welches Trikot trägt der beste Bergfahrer der Tour de France?|Gepunktetes Trikot|Grünes Trikot|Weißes Trikot|Rotes Trikot",
+"Welcher Deutsche gewann 1997 die Tour de France?|Jan Ullrich|Erik Zabel|Andreas Klöden|Tony Martin",
+"Wer war der erste deutsche Formel-1-Weltmeister?|Michael Schumacher|Sebastian Vettel|Nico Rosberg|Heinz-Harald Frentzen",
+"Wer wurde 2016 Formel-1-Weltmeister und hörte danach auf?|Nico Rosberg|Lewis Hamilton|Sebastian Vettel|Jenson Button",
+"In welchem Land wurde Basketball erfunden?|USA|Kanada|England|Frankreich",
+"Wie hoch hängt das Netz beim Volleyball der Männer?|2,43 m|2,24 m|2,60 m|2,10 m",
+"Wie lang ist ein olympisches Schwimmbecken?|50 Meter|25 Meter|100 Meter|75 Meter",
+"Über wie viele Runden geht ein WM-Kampf im Profiboxen höchstens?|12|10|15|9",
+"Wie heißt die Trophäe für den Deutschen Fußballmeister?|Meisterschale|DFB-Pokal|Goldener Schuh|Supercup",
+"Wie nennt man drei Tore eines Spielers in einem Spiel?|Hattrick|Doppelpack|Triple|Dreierkette",
+"In welcher Sportart spielt man den Ryder Cup?|Golf|Tennis|Segeln|Rugby",
+"In welcher Sportart spielt man den Davis Cup?|Tennis|Golf|Segeln|Hockey",
+"In welcher Stadt steht das Maracanã-Stadion?|Rio de Janeiro|São Paulo|Buenos Aires|Lissabon",
+"An welchem Ort beginnt die Vierschanzentournee?|Oberstdorf|Garmisch-Partenkirchen|Innsbruck|Bischofshofen"
+],
+film:[
+"Wer führte bei „Titanic“ Regie?|James Cameron|Steven Spielberg|Ridley Scott|Peter Jackson",
+"Wie heißt die Schule von Harry Potter?|Hogwarts|Durmstrang|Beauxbatons|Ilvermorny",
+"Welche Pille nimmt Neo in „Matrix“?|Die rote|Die blaue|Die grüne|Die weiße",
+"In welcher Stadt spielt „Breaking Bad“?|Albuquerque|Phoenix|El Paso|Las Vegas",
+"Wer spielte den Joker in „The Dark Knight“?|Heath Ledger|Joaquin Phoenix|Jared Leto|Jack Nicholson",
+"Wie heißt der Vater von Simba?|Mufasa|Scar|Rafiki|Zazu",
+"In welchem Land wurde „Der Herr der Ringe“ gedreht?|Neuseeland|Irland|Kanada|Island",
+"Wie heißt das Schiff von Jack Sparrow?|Black Pearl|Flying Dutchman|Interceptor|Walross",
+"Aus welchem Land kommt die Serie „Squid Game“?|Südkorea|Japan|China|Thailand",
+"Wie heißt die Stadt der Simpsons?|Springfield|Shelbyville|Quahog|South Park",
+"Wer spielt Tony Stark alias Iron Man?|Robert Downey Jr.|Chris Evans|Chris Hemsworth|Mark Ruffalo",
+"Welches Auto ist die Zeitmaschine in „Zurück in die Zukunft“?|DeLorean|Mustang|Corvette|Trans Am",
+"Wie heißt der Hammer von Thor?|Mjölnir|Gungnir|Excalibur|Aegis",
+"Wer führte bei „Pulp Fiction“ Regie?|Quentin Tarantino|Martin Scorsese|Guy Ritchie|David Fincher",
+"Welche Masken tragen die Räuber in „Haus des Geldes“?|Salvador Dalí|Pablo Picasso|Guy Fawkes|Che Guevara",
+"Wie heißt der Schneemann in „Die Eiskönigin“?|Olaf|Sven|Kristoff|Hans",
+"Welcher Film gewann 2020 als erster nicht englischsprachiger den Oscar als bester Film?|Parasite|Roma|Ziemlich beste Freunde|Das Leben ist schön",
+"Welchen Beruf hat Walter White zu Beginn von „Breaking Bad“?|Chemielehrer|Apotheker|Arzt|Polizist",
+"Wer spielt die Hauptrolle in „John Wick“?|Keanu Reeves|Jason Statham|Liam Neeson|Tom Cruise",
+"Wie heißt das Königreich von Black Panther?|Wakanda|Zamunda|Asgard|Genosha",
+"Welcher Film startete 2023 am selben Tag wie „Barbie“?|Oppenheimer|Dune: Part Two|Avatar 2|Top Gun: Maverick",
+"Was ist Patrick in „SpongeBob Schwammkopf“?|Ein Seestern|Ein Tintenfisch|Eine Krabbe|Eine Qualle",
+"Wie heißt das Raumschiff von Han Solo?|Millennium Falke|Enterprise|Nostromo|Serenity",
+"Welcher Schauspieler spielt Forrest Gump?|Tom Hanks|Kevin Costner|Robin Williams|Bill Murray",
+"Wer moderiert „Wer wird Millionär?“ in Deutschland?|Günther Jauch|Thomas Gottschalk|Jörg Pilawa|Kai Pflaume",
+"Welches Tier ist Remy in „Ratatouille“?|Ratte|Maus|Hamster|Waschbär",
+"In welcher fiktiven Stadt spielt „Stranger Things“?|Hawkins|Derry|Riverdale|Sunnydale",
+"Wer schrieb die Buchvorlage zu „Game of Thrones“?|George R. R. Martin|J. R. R. Tolkien|Stephen King|Andrzej Sapkowski",
+"Wie heißt der Clownfisch, den sein Vater sucht?|Nemo|Marlin|Dorie|Bruce",
+"Wer spielte James Bond in „Casino Royale“ (2006)?|Daniel Craig|Pierce Brosnan|Roger Moore|Sean Connery",
+"Wer spielt Dominic Toretto in „Fast & Furious“?|Vin Diesel|Dwayne Johnson|Paul Walker|Jason Statham",
+"Welcher Film hat weltweit am meisten eingespielt (nicht inflationsbereinigt)?|Avatar|Avengers: Endgame|Titanic|Star Wars: Das Erwachen der Macht",
+"Wie nennt Gollum den Ring?|Mein Schatz|Mein Meister|Mein Gold|Mein Stern",
+"In welcher Stadt wacht die Truppe im ersten „Hangover“-Film auf?|Las Vegas|Los Angeles|Miami|Bangkok",
+"Welcher Schauspieler spielt Thomas Shelby in „Peaky Blinders“?|Cillian Murphy|Tom Hardy|Benedict Cumberbatch|Michael Fassbender",
+"Wie heißt Sheldons Lieblingsausruf in „The Big Bang Theory“?|Bazinga|Yabba Dabba Doo|D’oh|Legendär",
+"Wer spielt Jack in „Titanic“?|Leonardo DiCaprio|Brad Pitt|Matt Damon|Johnny Depp",
+"Welche Farbe hat Yodas Lichtschwert?|Grün|Blau|Rot|Lila",
+"Wer schrieb die „Harry Potter“-Bücher?|J. K. Rowling|J. R. R. Tolkien|Suzanne Collins|Stephenie Meyer",
+"In welches Haus kommt Harry Potter?|Gryffindor|Slytherin|Ravenclaw|Hufflepuff",
+"Wie heißt Harry Potters Eule?|Hedwig|Errol|Krätze|Fawkes",
+"Wer führte bei „Der Herr der Ringe“ Regie?|Peter Jackson|James Cameron|Steven Spielberg|Christopher Nolan",
+"Wer spielte Vito Corleone im ersten „Der Pate“?|Marlon Brando|Al Pacino|Robert De Niro|Jack Nicholson",
+"Wer spielt Tony Montana in „Scarface“?|Al Pacino|Robert De Niro|Joe Pesci|Ray Liotta",
+"Wie lautet die erste Regel des Fight Club?|Man redet nicht über den Fight Club|Kämpfe dauern höchstens fünf Minuten|Immer nur zwei Mann pro Kampf|Wer neu ist, muss kämpfen",
+"Wer führte bei „Inception“ Regie?|Christopher Nolan|Denis Villeneuve|Ridley Scott|David Fincher",
+"In welcher Stadt lebt Batman?|Gotham City|Metropolis|Central City|Star City",
+"Von welchem Planeten stammt Superman?|Krypton|Vulkan|Tatooine|Asgard",
+"Wie heißt Spider-Man mit bürgerlichem Namen?|Peter Parker|Bruce Wayne|Clark Kent|Tony Stark",
+"Welcher Schurke löscht mit einem Fingerschnipsen das halbe Universum aus?|Thanos|Loki|Ultron|Galactus",
+"Wer spielte 2019 die Titelrolle in „Joker“?|Joaquin Phoenix|Heath Ledger|Jared Leto|Christian Bale",
+"Wer führte bei „Jurassic Park“ Regie?|Steven Spielberg|James Cameron|George Lucas|Ridley Scott",
+"Wer spielt Indiana Jones?|Harrison Ford|Tom Hanks|Mel Gibson|Kevin Costner",
+"Welcher Schauspieler sagt als Terminator „I’ll be back“?|Arnold Schwarzenegger|Sylvester Stallone|Bruce Willis|Jean-Claude Van Damme",
+"Wer spielt Rocky Balboa?|Sylvester Stallone|Arnold Schwarzenegger|Mickey Rourke|Dolph Lundgren",
+"Wer spielt John McClane in „Stirb langsam“?|Bruce Willis|Mel Gibson|Kurt Russell|Nicolas Cage",
+"Wie trinkt James Bond seinen Martini?|Geschüttelt, nicht gerührt|Gerührt, nicht geschüttelt|Auf Eis|Mit Zitrone",
+"Wer spielt Ethan Hunt in „Mission: Impossible“?|Tom Cruise|Matt Damon|Brad Pitt|Daniel Craig",
+"Wer spielt Captain Jack Sparrow?|Johnny Depp|Orlando Bloom|Jude Law|Colin Farrell",
+"Wer spielt Maximus in „Gladiator“?|Russell Crowe|Gerard Butler|Mel Gibson|Brad Pitt",
+"Wie heißt Simbas böser Onkel?|Scar|Shere Khan|Jafar|Hades",
+"Was bedeutet „Hakuna Matata“?|Keine Sorgen|Guten Tag|Viel Glück|Großer König",
+"Wie heißen die zwei Hauptfiguren in „Toy Story“?|Woody und Buzz|Mike und Sulley|Timon und Pumbaa|Marlin und Dorie",
+"Welches Studio machte „Toy Story“?|Pixar|DreamWorks|Illumination|Blue Sky",
+"Was für ein Wesen ist Shrek?|Ein Oger|Ein Troll|Ein Riese|Ein Kobold",
+"Wie heißt Annas Schwester in „Die Eiskönigin“?|Elsa|Belle|Ariel|Rapunzel",
+"Wie heißen die gelben Helfer von Gru?|Minions|Gremlins|Schlümpfe|Trolls",
+"Wie heißt der Panda in „Kung Fu Panda“?|Po|Shifu|Tai Lung|Baloo",
+"Was trägt das Haus in „Oben“ durch die Luft?|Luftballons|Ein Tornado|Ein Zeppelin|Raketen",
+"Wie heißt das rote Rennauto in „Cars“?|Lightning McQueen|Hook|Doc Hudson|Chick Hicks",
+"Wie heißt der Bär im „Dschungelbuch“?|Balu|Baghira|Kaa|King Louie",
+"Wer spielt Kevin in „Kevin – Allein zu Haus“?|Macaulay Culkin|Elijah Wood|Haley Joel Osment|Daniel Radcliffe",
+"Wie viele Oscars gewann „Titanic“?|11|7|9|14",
+"Wie heißt der Hauptpreis der Filmfestspiele von Cannes?|Goldene Palme|Goldener Bär|Goldener Löwe|Goldene Kamera",
+"Wie heißt der Hauptpreis der Berlinale?|Goldener Bär|Goldene Palme|Goldener Löwe|Goldene Kamera",
+"Wer spielt die Hauptrolle in „Fack ju Göhte“?|Elyas M’Barek|Matthias Schweighöfer|Til Schweiger|Florian David Fitz",
+"Wer drehte „Der Schuh des Manitu“?|Michael „Bully“ Herbig|Otto Waalkes|Til Schweiger|Hape Kerkeling",
+"In welchem deutschen Film von 1981 geht es um eine U-Boot-Besatzung?|Das Boot|Der Untergang|Die Welle|Lola rennt",
+"Welcher deutsche Film gewann 2023 vier Oscars?|Im Westen nichts Neues|Das Leben der Anderen|Toni Erdmann|Systemsprenger",
+"Unter welchem Namen wird Walter White zum Drogenboss?|Heisenberg|Einstein|Scarface|Gus",
+"Wie lautet das Motto des Hauses Stark in „Game of Thrones“?|Der Winter naht|Hört mich brüllen|Feuer und Blut|Wir säen nicht",
+"Welches Tier ziert das Wappen des Hauses Lannister?|Löwe|Wolf|Drache|Hirsch",
+"Wie heißt die Parallelwelt in „Stranger Things“?|Upside Down|Unterwelt|Nimmerland|The Void",
+"Welches Lied singen die Räuber in „Haus des Geldes“?|Bella Ciao|Volare|Azzurro|Con te partirò",
+"Wo arbeitet Homer Simpson?|Im Atomkraftwerk|In der Brauerei|Im Supermarkt|Bei der Polizei",
+"Wer erfand die Simpsons?|Matt Groening|Seth MacFarlane|Trey Parker|Mike Judge",
+"Wie heißt der Vater in „Family Guy“?|Peter Griffin|Stan Smith|Homer Simpson|Randy Marsh",
+"Welche „South Park“-Figur stirbt in den frühen Staffeln ständig?|Kenny|Kyle|Stan|Cartman",
+"In welcher Stadt lebt SpongeBob?|Bikini Bottom|Atlantis|Rock Bottom|Krabbenburg",
+"Welches Instrument spielt Thaddäus?|Klarinette|Flöte|Trompete|Geige",
+"Wie heißt das Café in „Friends“?|Central Perk|MacLaren’s|Monk’s|Luke’s Diner",
+"Wer sagt in „How I Met Your Mother“ ständig „legendär“?|Barney|Ted|Marshall|Robin",
+"In welcher fiktiven Kleinstadt spielt die deutsche Serie „Dark“?|Winden|Waldheim|Hawkins|Twin Peaks",
+"Um welchen Drogenboss geht es in den ersten Staffeln von „Narcos“?|Pablo Escobar|El Chapo|Tony Montana|Griselda Blanco",
+"In welcher Straße wohnt Sherlock Holmes?|Baker Street|Downing Street|Abbey Road|Fleet Street",
+"Wie nennen Fans das kleine grüne Wesen aus „The Mandalorian“?|Baby Yoda|Mini-Chewie|Ewok|Gizmo",
+"Wie heißt Ashs erstes Pokémon?|Pikachu|Glumanda|Schiggy|Bisasam",
+"Wie heißt der Held von „Dragon Ball“?|Son Goku|Naruto|Ruffy|Vegeta",
+"Was will Monkey D. Ruffy in „One Piece“ werden?|König der Piraten|Hokage|Pokémon-Meister|Admiral",
+"Welche Krimireihe läuft sonntags um 20:15 Uhr im Ersten?|Tatort|Der Alte|SOKO|Der Bulle von Tölz",
+"Wer moderiert „Germany’s Next Topmodel“?|Heidi Klum|Lena Gercke|Barbara Schöneberger|Sylvie Meis",
+"Wer moderierte jahrzehntelang „Wetten, dass..?“?|Thomas Gottschalk|Günther Jauch|Stefan Raab|Harald Schmidt",
+"In welchem Land steht das „Dschungelcamp“?|Australien|Südafrika|Thailand|Brasilien",
+"Welcher Schauspieler spielt Deadpool?|Ryan Reynolds|Hugh Jackman|Chris Pratt|Ryan Gosling",
+"Welchen Helden mit Krallen spielt Hugh Jackman?|Wolverine|Sabretooth|Beast|Cyclops",
+"Wer spielt Hermine in den „Harry Potter“-Filmen?|Emma Watson|Emma Stone|Keira Knightley|Natalie Portman",
+"Wer spielt Katniss in „Die Tribute von Panem“?|Jennifer Lawrence|Kristen Stewart|Shailene Woodley|Emma Roberts",
+"Was ist E.T.?|Ein Außerirdischer|Ein Roboter|Ein Geist|Ein Dinosaurier",
+"Welche Serie spielt auf dem Kontinent Westeros?|Game of Thrones|The Witcher|Vikings|Die Ringe der Macht",
+"Wer spielt Geralt in den ersten Staffeln von „The Witcher“?|Henry Cavill|Chris Hemsworth|Jason Momoa|Kit Harington",
+"In welcher Zombie-Serie ist Rick Grimes die Hauptfigur?|The Walking Dead|The Last of Us|Z Nation|Black Summer",
+"Welcher Zauberer ist in „Der Herr der Ringe“ erst grau, dann weiß?|Gandalf|Saruman|Radagast|Dumbledore",
+"Wie heißt der große Bösewicht in „Harry Potter“?|Lord Voldemort|Sauron|Darth Sidious|Gellert Grindelwald",
+"Wie heißt der kleine Roboter, der die vermüllte Erde aufräumt?|WALL·E|R2-D2|Baymax|C-3PO",
+"In welchem Film strandet Tom Hanks mit einem Volleyball namens Wilson?|Cast Away|Captain Phillips|Der Soldat James Ryan|Terminal",
+"Wie heißt Tarantinos Western mit Jamie Foxx als Kopfgeldjäger?|Django Unchained|The Hateful Eight|Kill Bill|Inglourious Basterds"
+],
+med:[
+"Aus wie vielen Hohlräumen (Vorhöfe und Kammern) besteht das Herz?|4|2|3|6",
+"Welches Organ filtert das Blut und bildet den Urin?|Niere|Leber|Milz|Blase",
+"Welches Organ produziert Insulin?|Bauchspeicheldrüse|Leber|Schilddrüse|Niere",
+"Wie heißt der längste Knochen des Menschen?|Oberschenkelknochen|Schienbein|Oberarmknochen|Wadenbein",
+"Was ist das größte Organ des Menschen?|Haut|Leber|Lunge|Darm",
+"Wie viele Zähne hat ein Erwachsener mit allen Weisheitszähnen?|32|28|30|36",
+"Wie hoch ist die normale Körpertemperatur ungefähr?|37 °C|35 °C|39 °C|40 °C",
+"Welche Blutzellen transportieren den Sauerstoff?|Rote Blutkörperchen|Weiße Blutkörperchen|Blutplättchen|Nervenzellen",
+"Welche Blutbestandteile lassen das Blut an einer Wunde gerinnen?|Blutplättchen|Rote Blutkörperchen|Weiße Blutkörperchen|Antikörper",
+"Gegen welche Erreger wirken Antibiotika?|Bakterien|Viren|Pollen|Zecken",
+"Unter welcher Nummer erreicht man in Deutschland den Rettungsdienst?|112|110|115|116 117",
+"Was hört ein Arzt mit dem Stethoskop ab?|Herz und Lunge|Knie und Hüfte|Augen und Ohren|Zähne und Kiefer",
+"Wie heißt ein Facharzt für Hautkrankheiten?|Dermatologe|Orthopäde|Urologe|Neurologe",
+"Welcher Facharzt kümmert sich um das Herz?|Kardiologe|Nephrologe|Gastroenterologe|Onkologe",
+"Was behandelt ein Orthopäde?|Knochen und Gelenke|Augen|Nieren|Zähne",
+"Welche Krankheit nennt man umgangssprachlich „Zuckerkrankheit“?|Diabetes|Gicht|Rheuma|Asthma",
+"Welches Vitamin steckt besonders in Zitrusfrüchten?|Vitamin C|Vitamin D|Vitamin K|Vitamin B12",
+"Wer entdeckte das Penicillin?|Alexander Fleming|Robert Koch|Louis Pasteur|Wilhelm Röntgen",
+"Welches Organ untersucht man mit einem EKG?|Herz|Gehirn|Lunge|Magen",
+"Wie heißt die größte Schlagader des Körpers?|Aorta|Hohlvene|Halsschlagader|Pfortader",
+"Wie heißt der farbige Teil des Auges?|Iris|Pupille|Netzhaut|Hornhaut",
+"Wo sitzt der kleinste Knochen des Menschen?|Im Ohr|In der Hand|Im Fuß|In der Nase",
+"Was ist eine Fraktur?|Ein Knochenbruch|Eine Prellung|Ein Muskelriss|Eine Verstauchung",
+"Was ist ein Hämatom?|Ein blauer Fleck|Ein Knochenbruch|Eine Narbe|Eine Warze",
+"Welches Organ ist bei einer Hepatitis entzündet?|Leber|Niere|Lunge|Herz",
+"Wo im Bauch liegt der Blinddarm?|Rechts unten|Links unten|Rechts oben|Links oben",
+"Wie viele Liter Blut hat ein Erwachsener ungefähr?|5 bis 6|2 bis 3|8 bis 9|10 bis 12",
+"Wie oft schlägt das Herz eines Erwachsenen in Ruhe pro Minute?|60 bis 80 Mal|20 bis 30 Mal|120 bis 140 Mal|150 bis 180 Mal",
+"Welcher Muskel ist der wichtigste für die Atmung?|Zwerchfell|Bizeps|Herzmuskel|Kaumuskel",
+"Wie viele Rippenpaare hat der Mensch?|12|10|14|8",
+"Wo sitzt das Gleichgewichtsorgan?|Im Innenohr|Im Auge|In der Nase|Im Knie",
+"Was ist ein Placebo?|Ein Scheinmedikament ohne Wirkstoff|Ein starkes Schmerzmittel|Ein Impfstoff|Ein Narkosemittel",
+"Welchen Körperteil untersucht ein HNO-Arzt nicht?|Augen|Hals|Nase|Ohren",
+"Was bedeutet „Anästhesie“?|Betäubung|Blutabnahme|Beatmung|Wundnaht",
+"Welches Tier überträgt Borreliose?|Zecke|Mücke|Floh|Wespe",
+"In welche Lage bringt man Bewusstlose, die noch atmen?|Stabile Seitenlage|Schocklage|Bauchlage|Sitzposition",
+"In welchem Takt wechseln Herzdruckmassage und Beatmung bei der Wiederbelebung?|30 zu 2|15 zu 5|10 zu 1|50 zu 10",
+"Welches Tier windet sich um den Äskulapstab, das Zeichen der Medizin?|Schlange|Aal|Eidechse|Wurm",
+"Welches Hormon schüttet der Körper bei Stress und Gefahr aus?|Adrenalin|Insulin|Melatonin|Östrogen",
+"Wie lange dauert eine Schwangerschaft ungefähr?|40 Wochen|30 Wochen|36 Wochen|48 Wochen",
+"Welcher Wirkstoff steckt in Aspirin?|Acetylsalicylsäure|Paracetamol|Ibuprofen|Diclofenac",
+"Welche Krankheit wird durch Mücken übertragen?|Malaria|Tollwut|Borreliose|Masern",
+"Welches Organ pumpt das Blut durch den Körper?|Herz|Lunge|Leber|Milz",
+"Wie viele Lungenflügel hat der Mensch?|2|1|3|4",
+"Welches Organ baut Alkohol ab?|Leber|Niere|Magen|Milz",
+"Wie viele Nieren hat ein gesunder Mensch?|2|1|3|4",
+"Wie heißen die ersten Zähne eines Kindes?|Milchzähne|Weisheitszähne|Backenzähne|Eckzähne",
+"Was ist Karies?|Zahnfäule|Zahnfleischbluten|Zahnstein|Ein schiefer Zahn",
+"Was behandelt ein Urologe?|Nieren, Blase und Harnwege|Die Augen|Die Lunge|Das Gehirn",
+"Was behandelt ein Neurologe?|Gehirn und Nerven|Nieren|Haut|Knochen",
+"Wie heißt ein Frauenarzt in der Fachsprache?|Gynäkologe|Urologe|Pädiater|Radiologe",
+"Wie heißt ein Kinderarzt in der Fachsprache?|Pädiater|Geriater|Internist|Radiologe",
+"Was macht ein Radiologe?|Röntgen- und MRT-Bilder auswerten|Zähne ziehen|Narkosen geben|Blut abnehmen",
+"Was untersucht man bei einer Mammografie?|Die Brust|Den Magen|Das Gehirn|Die Lunge",
+"Welche Untersuchung arbeitet mit starken Magnetfeldern?|MRT|Röntgen|Ultraschall|EKG",
+"Welche Untersuchung arbeitet mit Schallwellen?|Ultraschall|Röntgen|MRT|CT",
+"Ab welcher Körpertemperatur spricht man bei Erwachsenen von Fieber?|Ab etwa 38 °C|Ab etwa 36 °C|Ab etwa 37 °C|Ab etwa 40 °C",
+"Welcher Blutdruck gilt bei Erwachsenen als ideal?|Etwa 120 zu 80|Etwa 80 zu 40|Etwa 160 zu 100|Etwa 200 zu 120",
+"Wie heißt Bluthochdruck in der Fachsprache?|Hypertonie|Hypotonie|Anämie|Arrhythmie",
+"Was fehlt dem Körper bei Blutarmut häufig?|Eisen|Zucker|Salz|Vitamin C",
+"Was ist bei einem Herzinfarkt verstopft?|Ein Herzkranzgefäß|Die Luftröhre|Eine Beinvene|Die Speiseröhre",
+"Welches Organ ist bei einem Schlaganfall betroffen?|Gehirn|Herz|Lunge|Leber",
+"Was ist ein typisches Warnzeichen für einen Schlaganfall?|Ein hängender Mundwinkel|Juckende Haut|Schluckauf|Nasenbluten",
+"Welches Gelenk ist bei einem Meniskusriss verletzt?|Knie|Schulter|Ellbogen|Handgelenk",
+"Wo liegt die Achillessehne?|An der Ferse|Am Knie|Am Ellbogen|Im Nacken",
+"Wie heißt das Gelenk zwischen Ober- und Unterarm?|Ellbogen|Handgelenk|Schulter|Knöchel",
+"Welcher Knochen schützt das Gehirn?|Schädel|Brustbein|Becken|Schlüsselbein",
+"Welche Knochen schützen Herz und Lunge?|Rippen|Wirbel|Schulterblätter|Beckenknochen",
+"Was verbindet Muskeln mit Knochen?|Sehnen|Bänder|Knorpel|Nerven",
+"Was polstert die Gelenke?|Knorpel|Sehnen|Fettgewebe|Nerven",
+"Wohin kommt das Essen direkt nach der Speiseröhre?|In den Magen|In den Dünndarm|In die Leber|In die Lunge",
+"Welcher Darmabschnitt ist der längste?|Dünndarm|Dickdarm|Blinddarm|Mastdarm",
+"Welche Flüssigkeit zersetzt im Magen die Nahrung?|Magensäure|Galle|Speichel|Lymphe",
+"Welches Organ speichert die Galle?|Gallenblase|Milz|Blinddarm|Bauchspeicheldrüse",
+"Durch welche Röhre strömt die Luft in die Lunge?|Luftröhre|Speiseröhre|Aorta|Harnröhre",
+"Welches Abfallgas gibt der Körper beim Ausatmen ab?|Kohlendioxid|Sauerstoff|Helium|Wasserstoff",
+"Wie heißt der rote Blutfarbstoff?|Hämoglobin|Melanin|Insulin|Keratin",
+"Welcher Farbstoff bräunt die Haut?|Melanin|Hämoglobin|Chlorophyll|Karotin",
+"Woraus bestehen Haare und Nägel?|Keratin|Kalk|Knorpel|Kollagen",
+"Welche Blutgruppen gibt es im AB0-System?|A, B, AB und 0|A, B, C und D|1, 2, 3 und 4|X, Y und Z",
+"Welche Blutzellen bekämpfen Krankheitserreger?|Weiße Blutkörperchen|Rote Blutkörperchen|Blutplättchen|Fettzellen",
+"Was löst eine echte Grippe aus?|Viren|Bakterien|Pilze|Kälte",
+"Was löst Heuschnupfen aus?|Pollen|Viren|Bakterien|Kälte",
+"Wie nennt man eine Überreaktion des Immunsystems auf harmlose Stoffe?|Allergie|Infektion|Vergiftung|Entzündung",
+"Welche Krankheit löst das HI-Virus aus?|AIDS|Hepatitis|Tuberkulose|Malaria",
+"Welche Seuche nannte man im Mittelalter den „Schwarzen Tod“?|Pest|Cholera|Pocken|Lepra",
+"Wovor schützt die Tetanus-Impfung?|Wundstarrkrampf|Kinderlähmung|Masern|Keuchhusten",
+"Welche Krankheit zeigt sich durch juckende Bläschen am ganzen Körper?|Windpocken|Masern|Mumps|Röteln",
+"Welches Vitamin ist wichtig für die Augen und steckt als Vorstufe in Karotten?|Vitamin A|Vitamin C|Vitamin D|Vitamin K",
+"Welcher Mineralstoff macht Knochen und Zähne hart?|Kalzium|Eisen|Jod|Natrium",
+"Welches Organ braucht Jod für seine Hormone?|Schilddrüse|Leber|Niere|Milz",
+"Wo sitzt die Schilddrüse?|Am Hals|Im Bauch|Hinter dem Herzen|Im Kopf",
+"Welches Hormon macht abends müde?|Melatonin|Adrenalin|Insulin|Testosteron",
+"Wie viele Stunden Schlaf empfehlen Ärzte Erwachsenen pro Nacht?|7 bis 9|4 bis 5|5 bis 6|10 bis 12",
+"Was bedeutet „ambulant“?|Behandlung ohne Übernachtung in der Klinik|Behandlung im Rettungswagen|Behandlung auf der Intensivstation|Behandlung nur am Wochenende",
+"Was bedeutet „chronisch“?|Lang andauernd|Plötzlich auftretend|Ansteckend|Harmlos",
+"Was bedeutet „akut“?|Plötzlich auftretend|Lang andauernd|Ansteckend|Angeboren",
+"Was ist eine Diagnose?|Die Feststellung einer Krankheit|Die Behandlung einer Krankheit|Eine Impfung|Eine Operation",
+"Was ist ein Symptom?|Ein Krankheitszeichen|Ein Medikament|Eine Operation|Ein Erreger",
+"Was macht ein Chirurg?|Er operiert|Er verschreibt Brillen|Er massiert|Er mischt Medikamente",
+"Wogegen hilft Ibuprofen vor allem?|Schmerzen und Entzündungen|Bakterien|Allergien|Bluthochdruck",
+"Wogegen wirkt ein Antihistaminikum?|Allergien|Schmerzen|Bakterien|Fieber",
+"Was tut man bei einer kleinen Verbrennung zuerst?|Mit lauwarmem Wasser kühlen|Butter daraufstreichen|Mehl daraufstreuen|Die Blase aufstechen",
+"Was tut man bei Nasenbluten?|Kopf leicht nach vorn beugen|Kopf in den Nacken legen|Flach hinlegen|Kräftig schnäuzen",
+"Jemand reagiert nicht und atmet nicht. Was tun?|112 rufen und Herzdruckmassage|Seitenlage und abwarten|Wasser ins Gesicht spritzen|Etwas zu trinken geben",
+"Wie schnell drückt man bei der Herzdruckmassage?|100 bis 120 Mal pro Minute|30 bis 40 Mal pro Minute|60 Mal pro Minute|200 Mal pro Minute",
+"Wie sieht das Erste-Hilfe-Zeichen aus?|Weißes Kreuz auf Grün|Rotes Kreuz auf Blau|Grünes Kreuz auf Gelb|Blaues Kreuz auf Weiß",
+"Wofür nutzt man einen Defibrillator?|Für Stromstöße bei Herzstillstand|Zum Beatmen|Zum Blutdruckmessen|Zur Blutwäsche",
+"Wozu dient ein Gips?|Er stellt gebrochene Knochen ruhig|Er kühlt Prellungen|Er desinfiziert Wunden|Er senkt Fieber",
+"Was ist ein Tinnitus?|Ein Dauergeräusch im Ohr|Eine Augenentzündung|Ein Hautausschlag|Ein Muskelkrampf",
+"Was ist eine Gehirnerschütterung?|Eine leichte Hirnverletzung nach einem Stoß|Ein Schlaganfall|Eine Hirnhautentzündung|Ein Tumor",
+"Welches Organ ist bei Asthma betroffen?|Lunge|Herz|Magen|Niere",
+"Was ist bei einer Gastritis entzündet?|Die Magenschleimhaut|Die Lunge|Die Blase|Das Zahnfleisch",
+"Wo sitzen die Mandeln?|Im Rachen|In der Nase|Im Ohr|Im Magen",
+"Wie nennt man die Gelbfärbung der Haut bei Leberproblemen?|Gelbsucht|Rotlauf|Blausucht|Scharlach",
+"Was messen Diabetiker regelmäßig?|Den Blutzucker|Den Puls|Den Augendruck|Die Lungenfunktion",
+"Wo fühlt man den Puls am leichtesten?|Am Handgelenk oder Hals|Am Knie|An der Stirn|Am Bauchnabel",
+"Wie viele Milchzähne hat ein Kind?|20|16|24|28",
+"Wie viele Chromosomen hat ein Mensch in der Regel?|46|23|44|48",
+"Wie heißt die Verbindung zwischen Mutter und ungeborenem Kind?|Nabelschnur|Speiseröhre|Eileiter|Achillessehne",
+"Welches Organ versorgt das Baby im Mutterleib?|Plazenta|Milz|Blinddarm|Schilddrüse",
+"Was ist ein Kaiserschnitt?|Eine Geburt per Operation|Eine Zahnbehandlung|Eine Herzoperation|Eine Hauttransplantation",
+"Wie heißt die Lehre vom Aufbau des Körpers?|Anatomie|Pathologie|Pharmazie|Hygiene",
+"Wie heißt der Eid, auf den sich Ärzte traditionell berufen?|Hippokratischer Eid|Sokratischer Eid|Olympischer Eid|Galenischer Eid"
+]};
+const EST=[
+"Wie hoch ist der Eiffelturm (in Metern)?|330|m",
+"Wie hoch ist der Kölner Dom (in Metern)?|157|m",
+"Wie hoch ist das Burj Khalifa (in Metern)?|828|m",
+"Wie hoch ist die Zugspitze (in Metern)?|2962|m",
+"Wie lang ist der Rhein (in Kilometern)?|1233|km",
+"Wie lang ist die Chinesische Mauer mit allen Abschnitten (in Kilometern)?|21196|km",
+"Wie viele Einwohner hat Australien (in Millionen)?|27|Mio.",
+"Wie viele Einwohner hat Japan (in Millionen)?|124|Mio.",
+"Wie viele Länder gehören zur UNO?|193|",
+"Wie viele Elemente stehen im Periodensystem?|118|",
+"Wie weit ist der Mond im Schnitt von der Erde entfernt (in Kilometern)?|384400|km",
+"Wie groß ist der Erdumfang am Äquator (in Kilometern)?|40075|km",
+"Wie schnell ist Schall in der Luft (in km/h)?|1235|km/h",
+"In welchem Jahr wurde YouTube gegründet?|2005|J",
+"In welchem Jahr wurde Nintendo gegründet?|1889|J",
+"In welchem Jahr sank die Titanic?|1912|J",
+"In welchem Jahr wurde Coca-Cola erfunden?|1886|J",
+"In welchem Jahr wurde die erste SMS verschickt?|1992|J",
+"In welchem Jahr startete die Fußball-Bundesliga?|1963|J",
+"In welchem Jahr fand das erste Oktoberfest statt?|1810|J",
+"Wie viele Zimmer hat der Buckingham Palace?|775|",
+"Wie viele Zuschauer passen ins Dortmunder Stadion?|81365|",
+"Wie viele Bundesliga-Tore schoss Gerd Müller?|365|",
+"Wie viele Stunden hat ein Jahr mit 365 Tagen?|8760|",
+"Wie viele Kilometer Autobahn gibt es in Deutschland?|13200|km",
+"Wie viele Folgen hat „Breaking Bad“?|62|",
+"Wie viele Pokémon gab es in der ersten Generation?|151|",
+"Wie viele Tage braucht der Mars für eine Runde um die Sonne?|687|Tage",
+"Wie lang ist der Gotthard-Basistunnel (in Kilometern)?|57|km",
+"Wie viele Monate dauert die Schwangerschaft eines Elefanten?|22|Monate",
+"Wie viele Menschen standen bisher auf dem Mond?|12|",
+"Wie viele Stufen führen bis zur Spitze des Eiffelturms?|1665|",
+"Wie viel Prozent der Erdoberfläche sind von Wasser bedeckt?|71|%",
+"Wie hoch ist der Salto Ángel, der höchste Wasserfall der Welt (in Metern)?|979|m",
+"Wie hoch ist der Berliner Fernsehturm (in Metern)?|368|m",
+"Wie hoch ist der Mount Everest (in Metern)?|8849|m",
+"Wie hoch ist die Freiheitsstatue mit Sockel (in Metern)?|93|m",
+"Wie hoch ist das Ulmer Münster (in Metern)?|162|m",
+"Wie lang ist die Donau (in Kilometern)?|2857|km",
+"Wie lang ist der Nil (in Kilometern)?|6650|km",
+"Wie lang ist die Elbe (in Kilometern)?|1094|km",
+"Wie lang ist die Golden Gate Bridge (in Metern)?|2737|m",
+"Wie viele Einwohner hat Deutschland (in Millionen)?|84|Mio.",
+"Wie viele Einwohner hat die Schweiz (in Millionen)?|9|Mio.",
+"Wie viele Einwohner haben die USA (in Millionen)?|340|Mio.",
+"Wie viele Einwohner hat Frankreich (in Millionen)?|68|Mio.",
+"Wie viele Einwohner hat die Türkei (in Millionen)?|86|Mio.",
+"Wie viele Einwohner hat Island (in Tausend)?|390|Tsd.",
+"Wie viele Sprachen gibt es weltweit ungefähr?|7100|",
+"Wie oft schlägt ein Herz pro Tag ungefähr?|100000|",
+"Wie viele Haare hat ein Mensch im Schnitt auf dem Kopf?|100000|",
+"Wie viele Felder hat ein Monopoly-Brett?|40|",
+"Wie weit ist die Sonne von der Erde entfernt (in Millionen Kilometern)?|150|Mio. km",
+"Wie groß ist der Durchmesser der Erde (in Kilometern)?|12742|km",
+"Wie heiß ist die Oberfläche der Sonne (in Grad Celsius)?|5500|°C",
+"Wie schnell ist das Licht (in Kilometern pro Sekunde)?|299792|km/s",
+"Wie schnell war Usain Bolt in der Spitze (in km/h)?|45|km/h",
+"In welchem Jahr wurde Google gegründet?|1998|J",
+"In welchem Jahr wurde Amazon gegründet?|1994|J",
+"In welchem Jahr wurde Apple gegründet?|1976|J",
+"In welchem Jahr erschien das erste „GTA“?|1997|J",
+"In welchem Jahr kam die erste PlayStation auf den Markt?|1994|J",
+"In welchem Jahr wurde der Eiffelturm eröffnet?|1889|J",
+"In welchem Jahr wurde die erste E-Mail verschickt?|1971|J",
+"In welchem Jahr ging Wikipedia online?|2001|J",
+"In welchem Jahr wurde Netflix gegründet?|1997|J",
+"In welchem Jahr startete Bitcoin?|2009|J",
+"In welchem Jahr kam Instagram heraus?|2010|J",
+"In welchem Jahr erschien „Fortnite“?|2017|J",
+"In welchem Jahr wurde das Brandenburger Tor fertig?|1791|J",
+"In welchem Jahr wurde die Mona Lisa gestohlen?|1911|J",
+"In welchem Jahr erschien der erste „Harry Potter“-Band?|1997|J",
+"In welchem Jahr öffnete Disneyland in Kalifornien?|1955|J",
+"In welchem Jahr wurde Adidas gegründet?|1949|J",
+"In welchem Jahr fand die erste Fußball-WM statt?|1930|J",
+"In welchem Jahr kam der erste „Star Wars“-Film ins Kino?|1977|J",
+"Wie viele Zimmer hat Schloss Versailles?|2300|",
+"Wie viele Inseln gehören zu Venedig?|118|",
+"Wie viele Brücken hat Hamburg ungefähr?|2500|",
+"Wie viele Zuschauer passen ins Wembley-Stadion?|90000|",
+"Wie viele Tore schoss Lionel Messi im Kalenderjahr 2012?|91|",
+"Wie viele Tore schoss Robert Lewandowski in der Bundesliga-Saison 2020/21?|41|",
+"Wie viele Punkte machte Wilt Chamberlain in seinem Rekordspiel 1962?|100|",
+"Wie viele Formel-1-Rennen gewann Michael Schumacher?|91|",
+"Wie viele Teams spielen in der NBA?|30|",
+"Wie lang ist ein Fußballfeld bei Länderspielen (in Metern)?|105|m",
+"Wie viele Sekunden hat ein Tag?|86400|",
+"Wie viele Minuten hat eine Woche?|10080|",
+"Wie hoch ist der Hochsprung-Weltrekord der Männer (in Zentimetern)?|245|cm",
+"Wie weit ist der Weitsprung-Weltrekord der Männer (in Zentimetern)?|895|cm",
+"Wie tief ist der Bodensee an der tiefsten Stelle (in Metern)?|251|m",
+"Wie groß ist Deutschland (in Quadratkilometern)?|357600|km²",
+"Wie viele Zeitzonen hat Russland?|11|",
+"Wie viele Staaten hat Afrika?|54|",
+"Wie viele Streifen hat die US-Flagge?|13|",
+"Wie lang ist der Suezkanal (in Kilometern)?|193|km",
+"Wie lang ist der Panamakanal (in Kilometern)?|82|km",
+"Wie lang ist der Eurotunnel (in Kilometern)?|50|km",
+"Wie lang ist die Transsibirische Eisenbahn (in Kilometern)?|9288|km",
+"Wie lang ist die Route 66 (in Kilometern)?|3940|km",
+"Wie lang ist die Nordschleife des Nürburgrings (in Kilometern)?|21|km",
+"Wie hoch ist der Kilimandscharo (in Metern)?|5895|m",
+"Wie hoch ist das Empire State Building mit Antenne (in Metern)?|443|m",
+"Wie hoch ist der Schiefe Turm von Pisa (in Metern)?|56|m",
+"Wie hoch ist die Cheops-Pyramide heute (in Metern)?|139|m",
+"Wie hoch ist der Turm von Big Ben (in Metern)?|96|m",
+"Wie viele Stockwerke hat das Burj Khalifa?|163|",
+"Wie viele Jahre dauerte der Bau des Kölner Doms?|632|Jahre",
+"Wie viele Folgen hat „Game of Thrones“?|73|",
+"Wie viele Folgen hat „Friends“?|236|",
+"Wie viele James-Bond-Filme gibt es bis „Keine Zeit zu sterben“?|25|",
+"Wie lang ist „Avengers: Endgame“ (in Minuten)?|181|Min.",
+"Wie viele Zeichen durfte ein Tweet früher höchstens haben?|140|",
+"Wie viel kostete das erste iPhone in den USA (in Dollar)?|499|$",
+"Wie viele Eier legt eine Legehenne pro Jahr ungefähr?|300|",
+"Wie weit ist es Luftlinie von Berlin nach New York (in Kilometern)?|6385|km",
+"Wie weit ist es Luftlinie von Hamburg nach München (in Kilometern)?|612|km",
+"In welcher Höhe fliegt die ISS (in Kilometern)?|400|km",
+"Wie schnell fliegt die ISS (in km/h)?|27600|km/h",
+"Wie lange braucht die ISS für eine Runde um die Erde (in Minuten)?|92|Min.",
+"Wie viel Prozent des menschlichen Körpers bestehen aus Wasser?|60|%",
+"Wie viel Prozent der Luft sind Sauerstoff?|21|%",
+"Wie viel Prozent der Menschen sind Linkshänder?|10|%"
+];
+const WF=[
+"Bananen sind botanisch gesehen Beeren.|w",
+"Schottlands Nationaltier ist das Einhorn.|w",
+"Die Venus braucht für eine Drehung um sich selbst länger als für eine Runde um die Sonne.|w",
+"Kleopatra lebte zeitlich näher an der Mondlandung als am Bau der Cheops-Pyramide.|w",
+"Die Universität Oxford ist älter als das Reich der Azteken.|w",
+"Menschen und Giraffen haben gleich viele Halswirbel.|w|Beide haben sieben.",
+"Erdnüsse sind keine Nüsse, sondern Hülsenfrüchte.|w",
+"Bei Seepferdchen tragen die Männchen den Nachwuchs aus.|w",
+"Eisbären haben schwarze Haut.|w",
+"Schall ist im Wasser schneller als in der Luft.|w",
+"Hamburg hat mehr Brücken als Venedig.|w",
+"Russland und die USA liegen an der engsten Stelle keine 5 km auseinander.|w|Zwischen den Diomedes-Inseln sind es knapp 4 km.",
+"Der Hundertjährige Krieg dauerte länger als 100 Jahre.|w|Es waren 116 Jahre.",
+"Bluetooth ist nach einem Wikingerkönig benannt.|w|Nach Harald Blauzahn.",
+"Das erste YouTube-Video wurde in einem Zoo gedreht.|w",
+"Fanta wurde in Deutschland erfunden.|w",
+"Red Bull kommt aus Österreich.|w",
+"Null ist eine gerade Zahl.|w",
+"Eine Milliarde Sekunden sind rund 32 Jahre.|w",
+"Die Nationalhymne von Spanien hat keinen offiziellen Text.|w",
+"In der Schweiz darf man Meerschweinchen nicht einzeln halten.|w",
+"Der kürzeste Krieg der Geschichte dauerte weniger als eine Stunde.|w|Großbritannien gegen Sansibar, 1896.",
+"Mario hieß am Anfang „Jumpman“.|w",
+"Alaska gehörte früher zu Russland.|w|Die USA kauften es 1867.",
+"Die Chinesische Mauer sieht man mit bloßem Auge vom Mond aus.|f|Dafür ist sie viel zu schmal.",
+"Napoleon war für seine Zeit besonders klein.|f|Mit etwa 1,68 m war er durchschnittlich groß.",
+"Wikinger trugen Helme mit Hörnern.|f|Das ist eine Erfindung des 19. Jahrhunderts.",
+"Albert Einstein bekam den Nobelpreis für die Relativitätstheorie.|f|Er bekam ihn für den photoelektrischen Effekt.",
+"Julius Cäsar war römischer Kaiser.|f|Er war Diktator, aber nie Kaiser.",
+"Menschen nutzen nur 10 % ihres Gehirns.|f|Wir nutzen praktisch das ganze Gehirn.",
+"Goldfische haben ein Gedächtnis von drei Sekunden.|f|Sie erinnern sich über Monate.",
+"Stiere werden von der Farbe Rot wütend.|f|Sie reagieren auf die Bewegung des Tuchs.",
+"Fledermäuse sind blind.|f|Sie können sehen, manche sogar recht gut.",
+"Kamele speichern Wasser in ihren Höckern.|f|In den Höckern steckt Fett.",
+"Strauße stecken bei Gefahr den Kopf in den Sand.|f|Sie rennen weg oder legen sich flach hin.",
+"Ein Blitz schlägt nie zweimal an derselben Stelle ein.|f|Hohe Gebäude werden immer wieder getroffen.",
+"Darth Vader sagt im Original: „Luke, I am your father.“|f|Er sagt: „No, I am your father.“",
+"Leonardo DiCaprio gewann seinen ersten Oscar für „Titanic“.|f|Den bekam er erst 2016 für „The Revenant“.",
+"Pikachu ist ein Feuer-Pokémon.|f|Pikachu ist ein Elektro-Pokémon.",
+"YouTube ist älter als Facebook.|f|Facebook startete 2004, YouTube 2005.",
+"Elon Musk hat Tesla gegründet.|f|Gegründet wurde Tesla 2003 von Martin Eberhard und Marc Tarpenning.",
+"IKEA wurde in Norwegen gegründet.|f|IKEA kommt aus Schweden.",
+"Nutella kommt ursprünglich aus Frankreich.|f|Nutella kommt aus Italien.",
+"Die Beatles kamen aus London.|f|Sie kamen aus Liverpool.",
+"In der Antarktis leben Eisbären.|f|Eisbären leben nur in der Arktis.",
+"Der Bundespräsident wird direkt vom Volk gewählt.|f|Ihn wählt die Bundesversammlung.",
+"Die Eins ist eine Primzahl.|f|Primzahlen haben genau zwei Teiler.",
+"Im Basketball zählt ein Freiwurf zwei Punkte.|f|Ein Freiwurf zählt einen Punkt.",
+"Ein Blitz ist heißer als die Oberfläche der Sonne.|w",
+"Haie gab es schon vor den ersten Bäumen.|w",
+"Australien ist breiter als der Mond.|w|Australien misst rund 4.000 km, der Mond knapp 3.500 km.",
+"Der Eiffelturm ist im Sommer bis zu 15 cm höher als im Winter.|w|Das Metall dehnt sich in der Hitze aus.",
+"Der Mount Everest wächst jedes Jahr um ein paar Millimeter.|w",
+"Tomaten sind botanisch gesehen Früchte.|w",
+"Flamingos werden erst durch ihre Nahrung rosa.|w",
+"Ein Krokodil kann seine Zunge nicht herausstrecken.|w",
+"Koalas haben Fingerabdrücke, die denen von Menschen sehr ähneln.|w",
+"Wasser dehnt sich beim Gefrieren aus.|w",
+"Im Weltall kann sich Schall nicht ausbreiten.|w",
+"Die Sonne enthält über 99 Prozent der Masse unseres Sonnensystems.|w",
+"Diamanten bestehen aus Kohlenstoff.|w",
+"Der Saturn würde in Wasser schwimmen.|w|Seine Dichte ist geringer als die von Wasser.",
+"Ein Jahr auf dem Merkur dauert nur 88 Erdtage.|w",
+"Der Pazifik ist größer als alle Landflächen der Erde zusammen.|w",
+"Die Sahara war vor einigen tausend Jahren grün.|w",
+"Island liegt näher an Grönland als an Norwegen.|w",
+"Japan besteht aus mehr als 6.000 Inseln.|w",
+"Die Berliner Mauer stand 28 Jahre lang.|w",
+"Die Titanic sank auf ihrer ersten Fahrt.|w",
+"Marie Curie gewann zwei Nobelpreise.|w|Einen für Physik und einen für Chemie.",
+"Kolumbus wollte eigentlich nach Indien segeln.|w",
+"Beethoven war am Ende seines Lebens taub.|w",
+"Mozart wurde in Salzburg geboren.|w",
+"Das @-Zeichen heißt umgangssprachlich „Klammeraffe“.|w",
+"Google hieß am Anfang „BackRub“.|w",
+"Die erste Website der Welt ist heute noch online.|w|Sie liegt beim Forschungszentrum CERN.",
+"Lego kommt aus Dänemark.|w",
+"Haribo kommt aus Bonn.|w|Der Name steht für Hans Riegel, Bonn.",
+"Coca-Cola enthielt früher Kokain.|w|Bis Anfang des 20. Jahrhunderts steckte Kokablatt-Extrakt darin.",
+"Das Croissant hat seinen Ursprung in Wien.|w|Vorbild war das Wiener Kipferl.",
+"Paprika enthält mehr Vitamin C als Zitronen.|w",
+"Karotten waren ursprünglich nicht orange.|w|Früher waren sie meist violett, weiß oder gelb.",
+"Ein Regenbogen ist eigentlich ein ganzer Kreis.|w|Vom Boden aus sieht man nur den oberen Teil.",
+"Aus deutschen Steckdosen kommen 230 Volt.|w",
+"Ein Würfel hat acht Ecken.|w",
+"Eine Million Sekunden sind ungefähr elfeinhalb Tage.|w",
+"In Japan herrscht Linksverkehr.|w",
+"Monaco ist größer als der Vatikan.|w",
+"England, Schottland und Wales teilen sich eine Insel.|w",
+"Der längste Ortsname Europas liegt in Wales.|w",
+"Tischtennis ist eine olympische Sportart.|w",
+"Die Tour de France endet traditionell in Paris.|w",
+"SpongeBob wohnt in einer Ananas.|w",
+"Walt Disney sprach Micky Maus anfangs selbst.|w",
+"Die Erde ist der einzige Planet, der nicht nach einer Gottheit benannt ist.|w",
+"Honig kann praktisch nicht verderben.|w",
+"Babys haben mehr Knochen als Erwachsene.|w|Viele Knochen wachsen später zusammen.",
+"Der Mensch teilt rund 98 Prozent seiner Gene mit dem Schimpansen.|w",
+"Honigbienen sterben meist, wenn sie einen Menschen stechen.|w",
+"Auf einem hohen Berg kocht Wasser schon unter 100 Grad.|w",
+"Golf ist seit 2016 wieder olympisch.|w",
+"Euro-Bargeld gibt es seit 2002.|w",
+"Glas ist eine Flüssigkeit, die ganz langsam fließt.|f|Glas ist ein Feststoff.",
+"Pinguine leben am Nordpol.|f|Sie leben auf der Südhalbkugel.",
+"Afrika ist der größte Kontinent.|f|Der größte Kontinent ist Asien.",
+"Der Nil fließt von Norden nach Süden.|f|Er fließt nach Norden ins Mittelmeer.",
+"Liechtenstein grenzt an Deutschland.|f|Es liegt zwischen der Schweiz und Österreich.",
+"Spanien grenzt an Italien.|f|Dazwischen liegt Frankreich.",
+"Im Mittelalter hielten die Gelehrten die Erde für eine Scheibe.|f|Dass sie eine Kugel ist, wusste man schon in der Antike.",
+"Leonardo da Vinci malte die Decke der Sixtinischen Kapelle.|f|Das war Michelangelo.",
+"Deutschland gewann das WM-Finale 2014 gegen Brasilien.|f|Das Finale ging gegen Argentinien.",
+"Schach gehört zu den Olympischen Sommerspielen.|f|Schach war dort nie Medaillendisziplin.",
+"Der Joker ist der große Gegenspieler von Superman.|f|Er ist der Erzfeind von Batman.",
+"Das „i“ im iPhone steht für „intelligent“.|f|Apple führte das „i“ 1998 für „Internet“ ein.",
+"Haare und Nägel wachsen nach dem Tod weiter.|f|Die Haut trocknet nur ein und zieht sich zurück.",
+"Rasierte Haare wachsen dicker nach.|f|Sie fühlen sich nur stoppeliger an.",
+"Man verschluckt im Schlaf jedes Jahr mehrere Spinnen.|f|Dafür gibt es keinen Beleg.",
+"Spinat enthält außergewöhnlich viel Eisen.|f|Er enthält nicht mehr Eisen als viele andere Gemüse.",
+"Der Mensch stammt vom Schimpansen ab.|f|Beide haben nur gemeinsame Vorfahren.",
+"Das Blut in den Venen ist blau.|f|Blut ist immer rot, mal heller, mal dunkler.",
+"Hummeln dürften nach den Gesetzen der Physik gar nicht fliegen.|f|Ihr Flug ist längst erklärt.",
+"Pi ist genau 3,14.|f|Pi hat unendlich viele Nachkommastellen.",
+"Die Niederlande und Holland sind genau dasselbe.|f|Holland sind nur zwei Provinzen der Niederlande.",
+"Auf deutschen Autobahnen gilt überall Tempo 130.|f|130 ist nur die Richtgeschwindigkeit.",
+"Chamäleons wechseln die Farbe vor allem zur Tarnung.|f|Sie zeigen damit vor allem ihre Stimmung.",
+"Die Erde ist der Sonne im Sommer am nächsten.|f|Am nächsten ist sie ihr Anfang Januar.",
+"Der Mond leuchtet von selbst.|f|Er wirft nur das Licht der Sonne zurück.",
+"Die Sonne ist ein Planet.|f|Die Sonne ist ein Stern.",
+"Wale sind Fische.|f|Wale sind Säugetiere.",
+"Tintenfische haben rotes Blut.|f|Ihr Blut ist bläulich.",
+"Schlangen können blinzeln.|f|Sie haben keine beweglichen Augenlider.",
+"Geparden brüllen wie Löwen.|f|Geparden können nicht brüllen, sie schnurren und fiepen.",
+"Elefanten können springen.|f|Dafür sind sie zu schwer gebaut.",
+"Der Vesuv liegt auf Sizilien.|f|Der Vesuv liegt bei Neapel, auf Sizilien steht der Ätna.",
+"Venedig liegt am Atlantik.|f|Venedig liegt an der Adria.",
+"Beim Bowling stehen zwölf Pins.|f|Es sind zehn Pins.",
+"Vincent van Gogh verkaufte zu Lebzeiten Hunderte Bilder.|f|Sicher belegt ist nur ein einziger Verkauf.",
+"Die Mona Lisa ist ein riesiges Gemälde.|f|Sie misst nur etwa 77 mal 53 Zentimeter.",
+"Frankenstein ist der Name des Monsters.|f|So heißt der Wissenschaftler, das Monster hat keinen Namen.",
+"Der Text der deutschen Nationalhymne stammt von Goethe.|f|Er stammt von Hoffmann von Fallersleben.",
+"Im Berliner Reichstagsgebäude tagt der Bundesrat.|f|Dort tagt der Bundestag.",
+"Die Schweiz ist Mitglied der EU.|f|Die Schweiz gehört nicht zur EU.",
+"Kanadas Amtssprachen sind Englisch und Spanisch.|f|Es sind Englisch und Französisch.",
+"In Österreich bezahlt man mit Schilling.|f|Seit 2002 gilt dort der Euro.",
+"Der Äquator verläuft durch Ägypten.|f|Er verläuft viel weiter südlich, etwa durch Kenia.",
+"Der Rhein mündet in die Ostsee.|f|Er mündet in die Nordsee.",
+"Wespen können nur einmal stechen.|f|Wespen können mehrmals stechen.",
+"Ein Jahr hat genau 52 Wochen.|f|52 Wochen sind nur 364 Tage.",
+"Warme Luft sinkt nach unten.|f|Warme Luft steigt nach oben.",
+"Eisen ist schwerer als Gold.|f|Gold ist mehr als doppelt so dicht.",
+"Schall ist schneller als Licht.|f|Licht ist fast eine Million Mal schneller.",
+"Ein Lichtjahr ist eine Zeitspanne.|f|Es ist eine Entfernung.",
+"Sherlock Holmes sagt in den Büchern „Elementar, mein lieber Watson“.|f|Der Satz stammt aus späteren Verfilmungen."
+];
+</script>
+<script>
+(function(){
+'use strict';
+const DISC=[
+ {k:'allg',t:'quiz',n:'Allgemeinwissen',s:'Allgemein'},
+ {k:'est',t:'mini',n:'Schätzen',s:'Schätzen'},
+ {k:'geo',t:'quiz',n:'Geografie',s:'Geografie'},
+ {k:'wf',t:'mini',n:'Wahr oder falsch',s:'Wahr/Falsch'},
+ {k:'sport',t:'quiz',n:'Sport',s:'Sport'},
+ {k:'buzz',t:'mini',n:'Buzzer',s:'Buzzer'},
+ {k:'film',t:'quiz',n:'Film & Serien',s:'Film & Serie'},
+ {k:'reakt',t:'mini',n:'Reaktion',s:'Reaktion'},
+ {k:'med',t:'quiz',n:'Medizin',s:'Medizin'},
+ {k:'stopp',t:'mini',n:'Punktlandung',s:'Stoppuhr'}
+];
+const URK={1:'Ehrenurkunde',2:'Siegerurkunde',3:'Teilnehmerurkunde'};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rnd=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;};
+const fmt=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+const num=(v,u)=>(u==='J'?String(v):fmt(v))+(u&&u!=='J'?' '+u:'');
+const sec=v=>v.toFixed(2).replace('.',',');
+const store={
+ get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}},
+ set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+};
+const SEEN='dreikampf.seen.v1',PREF='dreikampf.pref.v1';
+const REDUCED=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+let seen=store.get(SEEN,{});
+// Zieht n Einträge, zuerst Ungesehenes; ist der Pool durch, wird er zurückgesetzt
+function draw(key,size,n){
+ const was=new Set(seen[key]||[]),fresh=[],old=[];
+ for(let i=0;i<size;i++)(was.has(i)?old:fresh).push(i);
+ shuffle(fresh);shuffle(old);
+ let out;
+ if(fresh.length>=n){out=fresh.slice(0,n);seen[key]=[...was,...out];}
+ else{out=fresh.concat(old.slice(0,n-fresh.length));seen[key]=out.slice();}
+ store.set(SEEN,seen);
+ return out;
+}
+const pref=store.get(PREF,{});
+const S={screen:'setup',n:[2,3,4,5,6].includes(pref.n)?pref.n:3,names:Array.isArray(pref.names)?pref.names.slice(0,6):[],target:[25,40,60].includes(pref.target)?pref.target:40,players:[],round:0,recent:[],rot:0,pick:null,goal:7,last:null,spinning:false};
+let C=null;
+
+// Uhr: ein Timeout und ein Intervall gleichzeitig
+const T={to:0,iv:0,start:0,total:0};
+function stopClock(){clearTimeout(T.to);clearInterval(T.iv);T.to=0;T.iv=0;T.total=0;}
+function after(ms,fn){clearTimeout(T.to);T.to=setTimeout(()=>{T.to=0;fn();},ms);}
+function countdown(s,fn){
+ stopClock();T.start=Date.now();T.total=s;
+ T.to=setTimeout(()=>{stopClock();fn();},s*1000);
+ T.iv=setInterval(()=>{const el=$('secs');if(el)el.textContent=Math.max(0,Math.ceil(s-(Date.now()-T.start)/1000));},250);
+}
+const tape=()=>{
+ if(!T.total)return '';
+ const el=(Date.now()-T.start)/1000;
+ return `<div class="tapewrap"><div class="tape"><i style="animation-duration:${T.total}s;animation-delay:-${el.toFixed(2)}s"></i></div><b id="secs">${Math.max(0,Math.ceil(T.total-el))}</b></div>`;
+};
+
+const nm=i=>esc(S.players[i].name);
+const bib=(i,c)=>`<span class="bib p${i}${c?' '+c:''}">${i+1}</span>`;
+const N=()=>S.players.length,ALL=()=>S.players.map((_,i)=>i),fill=v=>ALL().map(()=>v);
+const perQ=()=>N()<=3?3:2,perW=()=>N()<=4?4:3;
+const order=()=>ALL().map(i=>(S.round+i)%N());
+function give(p,pts){const pl=S.players[p],old=pl.score;pl.score=Math.max(0,old+pts);C.gain[p]+=pl.score-old;}
+// kleiner = besser, null = raus; Gleichstand teilt sich die bessere Punktzahl
+const rankPts=(vals,pts)=>vals.map(v=>v===null?0:(pts[vals.filter(w=>w!==null&&w<v).length]||0));
+function winner(){
+ const sc=S.players.map(p=>p.score),m=Math.max(...sc);
+ if(m<S.target)return -1;
+ const top=sc.reduce((a,s,i)=>s===m?a.concat(i):a,[]);
+ return top.length===1?top[0]:-1;
+}
+
+function buildBoard(){
+ $('board').innerHTML=S.players.map((p,i)=>`<div class="lane" id="ln${i}"><span class="bib p${i}">${i+1}</span><span class="nm">${esc(p.name)}</span><span class="trk"><i class="run p${i}"></i></span><b class="sc">0</b></div>`).join('');
+}
+function board(){
+ const b=$('board');b.hidden=S.screen==='setup';
+ if(b.hidden)return;
+ const act=S.screen==='play'&&C?C.actor:(S.screen==='wheel'?S.round%N():-1);
+ S.players.forEach((p,i)=>{
+  const l=$('ln'+i);if(!l)return;
+  l.classList.toggle('on',i===act);
+  l.querySelector('.run').style.setProperty('--f',Math.min(1,p.score/S.target));
+  l.querySelector('.sc').textContent=p.score;
+ });
+}
+const VIEW={},PLAY={},INIT={},A={};
+let lastKey='';
+function render(){
+ $('app').innerHTML=VIEW[S.screen]();
+ board();
+ const key=S.screen+(C?C.t:'');
+ if(key!==lastKey){lastKey=key;window.scrollTo(0,0);}
+}
+
+VIEW.setup=()=>`
+<section class="start">
+ <p class="eyebrow">Quiz &amp; Minigames für 2 bis 6</p>
+ <h1 class="logo">Drei<br>kampf</h1>
+ <div class="field"><span class="lbl">Wie viele spielen mit?</span>
+  <div class="seg five">${[2,3,4,5,6].map(v=>`<button id="c${v}" data-a="count" data-v="${v}" class="${S.n===v?'on':''}" aria-pressed="${S.n===v}">${v}</button>`).join('')}</div>
+ </div>
+ <div class="startlist">${Array.from({length:S.n},(_,i)=>i).map(i=>`<label class="slane"><span class="num">${i+1}</span><input id="n${i}" data-name="${i}" maxlength="12" placeholder="Name" value="${esc(S.names[i]||'')}" autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Name auf Bahn ${i+1}"></label>`).join('')}</div>
+ <div class="field"><span class="lbl">Ziellinie bei</span>
+  <div class="seg">${[[25,'kurz'],[40,'normal'],[60,'lang']].map(([v,t])=>`<button id="t${v}" data-a="target" data-v="${v}" class="${S.target===v?'on':''}" aria-pressed="${S.target===v}">${v}<small>${t}</small></button>`).join('')}</div>
+ </div>
+ <button class="go w" data-a="start">Wettkampf starten</button>
+ <p class="fine">Ein Handy reicht. Jede Runde wählt das Glücksrad eine Disziplin: fünf Quiz-Kategorien und fünf Minigames.</p>
+</section>`;
+
+function wheelSVG(){
+ const n=DISC.length,seg=360/n,r=146,c=150;
+ const pt=a=>{const t=a*Math.PI/180;return (c+r*Math.sin(t)).toFixed(2)+' '+(c-r*Math.cos(t)).toFixed(2);};
+ let h='';
+ DISC.forEach((d,i)=>{
+  const a0=i*seg,a1=a0+seg,mid=a0+seg/2,q=d.t==='quiz';
+  h+=`<path d="M${c} ${c}L${pt(a0)}A${r} ${r} 0 0 1 ${pt(a1)}Z" fill="${q?'#FFFDF7':'#16181B'}" stroke="#16181B" stroke-width="2"/>`;
+  h+=`<text transform="rotate(${mid-90} ${c} ${c})" x="${c+r-12}" y="${c}" text-anchor="end" dominant-baseline="central" fill="${q?'#16181B':'#FFD12E'}">${esc(d.s)}</text>`;
+ });
+ return `<svg id="wheel" viewBox="0 0 300 300" style="transform:rotate(${S.rot}deg)" aria-hidden="true">${h}<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="#16181B" stroke-width="5"/><circle cx="${c}" cy="${c}" r="20" fill="#FFD12E" stroke="#16181B" stroke-width="4"/></svg>`;
+}
+VIEW.wheel=()=>`
+<section class="center">
+ <p class="eyebrow">Runde ${S.round+1}</p>
+ <h2 class="hl">${nm(S.round%N())} dreht</h2>
+ <div class="wheelbox"><div class="pin"></div>${wheelSVG()}</div>
+ <button class="go w" id="spin" data-a="spin">Rad drehen</button>
+</section>`;
+
+function rules(d){
+ if(d.t==='quiz')return [`Jeder bekommt ${perQ()} eigene Fragen, 20 Sekunden pro Frage.`,'Richtig: 2 Punkte.','Falsch? Dann dürfen die anderen klauen. Wer schneller tippt, ist dran: 1 Punkt.'];
+ return {
+  est:['2 Schätzfragen, jeder tippt geheim.','Am nächsten dran: 3 Punkte. Zweiter: 1 Punkt.'],
+  wf:[`Jeder bekommt ${perW()} Aussagen, 7 Sekunden pro Aussage.`,'Jede richtige Antwort: 1 Punkt.'],
+  buzz:['Handy in die Mitte, jeder einen Finger an seinen Buzzer.','5 Fragen. Wer zuerst buzzert, antwortet.','Richtig: +2. Falsch: −1, dann dürfen die anderen.'],
+  reakt:['Tippen, sobald das Feld grün wird.','2 Versuche, der bessere zählt.','Platz 1: 4 Punkte, Platz 2: 2, Platz 3: 1.'],
+  stopp:[`Stoppe die Uhr bei genau ${String(S.goal).replace('.',',')} Sekunden.`,'Nach 3 Sekunden verschwindet die Anzeige.','Am nächsten dran: 4 Punkte, dann 2 und 1.']
+ }[d.k];
+}
+VIEW.intro=()=>{
+ const d=DISC.find(x=>x.k===S.pick),o=order();
+ return `<section class="paper">
+ <p class="tagline">${d.t==='quiz'?'Quiz':'Minigame'} · Runde ${S.round+1}</p>
+ <h2 class="title">${esc(d.n)}</h2>
+ <ul class="rules">${rules(d).map(r=>`<li>${r}</li>`).join('')}</ul>
+ <button class="go" data-a="go">${d.k==='buzz'?'Los':'Los: '+nm(o[0])+' fängt an'}</button>
+</section>`;
+};
+VIEW.play=()=>PLAY[C.t]();
+
+VIEW.card=()=>{
+ const L=S.last,w=winner(),sc=S.players.map(p=>p.score),m=Math.max(...sc);
+ const lead=sc.reduce((a,s,i)=>s===m?a.concat(i):a,[]);
+ let v;
+ if(w>=0)v=`${nm(w)} ist über der Ziellinie!`;
+ else if(m>=S.target)v='Ziellinie erreicht, aber Gleichstand. Es geht in die Verlängerung!';
+ else if(lead.length>1)v=`Gleichstand an der Spitze bei ${m} Punkten.`;
+ else v=`${nm(lead[0])} führt. Noch ${S.target-m} bis zur Ziellinie.`;
+ return `<section class="paper">
+ <div class="qhead"><span>Wertung Runde ${S.round}</span><span>${esc(L.n)}</span></div>
+ <div class="rows">${S.players.map((p,i)=>`<div class="row"><span class="rw">${bib(i)}<span>${nm(i)}</span><small>${esc(L.info[i]||'')}</small></span><b class="plus">${L.gain[i]>0?'+':''}${L.gain[i]}</b><b class="tot">${p.score}</b></div>`).join('')}</div>
+ <p class="verdict">${v}</p>
+ <button class="go" data-a="${w>=0?'final':'wheel'}">${w>=0?'Zur Siegerehrung':'Nächste Runde'}</button>
+</section>`;
+};
+
+VIEW.final=()=>{
+ const idx=ALL().sort((a,b)=>S.players[b].score-S.players[a].score),place=[1];
+ for(let i=1;i<idx.length;i++)place[i]=S.players[idx[i]].score===S.players[idx[i-1]].score?place[i-1]:i+1;
+ const slot=j=>j<idx.length?`<div class="step"><div class="pn">${bib(idx[j])}<span>${nm(idx[j])}</span></div><div class="blk b${Math.min(place[j],3)}">${place[j]}<small>${S.players[idx[j]].score} P.</small></div></div>`:'';
+ const rest=idx.slice(3).map((p,j)=>`<div class="row"><span class="rw">${bib(p)}<span>${nm(p)}</span><small>Platz ${place[j+3]}</small></span><b class="tot">${S.players[p].score}</b></div>`).join('');
+ return `<section class="center">
+ <p class="eyebrow">Siegerehrung nach ${S.round} Runden</p>
+ <h1 class="logo sm">${nm(idx[0])} gewinnt</h1>
+ <div class="podium">${slot(1)}${slot(0)}${slot(2)}</div>
+</section>
+<section class="paper urk">
+ <p class="tagline">Ehrenurkunde</p>
+ <p class="hand">${nm(idx[0])}</p>
+ <p>hat den Dreikampf mit ${S.players[idx[0]].score} Punkten gewonnen.</p>
+ <p class="fine2">${idx.slice(1,3).map((p,j)=>URK[Math.min(place[j+1],3)]+': '+nm(p)).join(' · ')}</p>
+ ${rest?`<div class="rows" style="width:100%;text-align:left">${rest}</div>`:''}
+</section>
+<button class="go w" data-a="rematch">Revanche</button>
+<button class="go ghost" data-a="names">Andere Namen</button>`;
+};
+
+/* ---------- Quiz mit Klauen ---------- */
+const parseQ=s=>{const p=s.split('|');return {q:p[0],opts:shuffle(p.slice(1).map((t,i)=>({t,ok:i===0})))};};
+function optsHTML(q,enabled,elim,reveal,sel){
+ return `<div class="opts">${q.opts.map((o,i)=>{
+  const gone=elim.includes(i);let c='opt';
+  if(reveal&&o.ok)c+=' ok';else if(gone)c+=' gone';else if(i===sel)c+=' sel';
+  return `<button class="${c}" data-a="ans" data-v="${i}"${enabled&&!gone?'':' disabled'}><i>${'ABCD'[i]}</i><span>${esc(o.t)}</span></button>`;
+ }).join('')}</div>`;
+}
+INIT.quiz=()=>{
+ const pool=QUIZ[C.k];
+ C.per=perQ();
+ C.qs=draw('q.'+C.k,pool.length,C.per*N()).map(i=>parseQ(pool[i]));
+ C.turn=0;C.hits=fill(0);askQuiz();
+};
+function askQuiz(){
+ C.q=C.qs[C.turn];C.asker=C.order[C.turn%N()];C.actor=C.asker;C.elim=[];C.cands=[];C.pick=-1;C.miss=-1;C.lock=0;C.res=null;C.phase='ask';
+ countdown(20,()=>quizMiss(-1));
+}
+// Eigene Frage verpatzt oder Zeit um: Die anderen dürfen klauen, der Schnellere ist dran
+function quizMiss(i){
+ stopClock();
+ if(i>=0)C.elim.push(i);
+ C.cands=ALL().filter(p=>p!==C.asker);
+ openSteal();
+}
+function openSteal(){
+ C.pick=-1;
+ if(!C.cands.length)return quizOver();
+ C.actor=C.cands.length===1?C.cands[0]:-1;
+ C.lock=Date.now()+700; // kurze Sperre gegen Doppeltipper
+ C.phase='steal';countdown(10,quizOver);render();
+}
+function quizOver(){stopClock();C.res={p:-1};C.actor=-1;C.phase='done';render();}
+function stealBy(p){
+ const i=C.pick;
+ if(C.q.opts[i].ok){give(p,1);C.res={p,pts:1};C.actor=-1;C.phase='done';return render();}
+ C.elim.push(i);C.miss=p;C.cands=C.cands.filter(x=>x!==p);
+ openSteal();
+}
+A.ans=v=>{
+ const i=+v;
+ if(!C)return;
+ if(C.t==='buzz')return buzzAns(i);
+ if(C.t!=='quiz'||C.elim.includes(i))return;
+ if(C.phase==='ask'){
+  if(!C.q.opts[i].ok)return quizMiss(i);
+  stopClock();give(C.actor,2);C.hits[C.actor]++;
+  C.res={p:C.actor,pts:2};C.actor=-1;C.phase='done';return render();
+ }
+ if(C.phase!=='steal'||Date.now()<C.lock)return;
+ stopClock();C.pick=i;
+ if(C.cands.length===1)return stealBy(C.cands[0]);
+ C.phase='who';render();
+ const w=$('who');if(w&&w.scrollIntoView)w.scrollIntoView({block:'nearest'});
+};
+A.who=v=>{if(C&&C.t==='quiz'&&C.phase==='who')stealBy(+v);};
+A.next=()=>{
+ C.turn++;
+ if(C.turn>=C.qs.length){C.info=C.hits.map(h=>h+' von '+C.per+' eigenen richtig');return endRound();}
+ askQuiz();render();
+};
+PLAY.quiz=()=>{
+ const q=C.q,done=C.phase==='done',who=C.phase==='who';let turn,cls='';
+ if(C.phase==='ask')turn=`${bib(C.actor)} <b>${nm(C.actor)}</b> ist dran · 2 Punkte`;
+ else if(C.phase==='steal'&&C.cands.length>1)turn='Falsch! Jetzt klauen: Wer schneller tippt, ist dran · 1 Punkt';
+ else if(C.phase==='steal')turn=`${C.miss>=0?nm(C.miss)+' lag daneben. ':'Falsch! '}${bib(C.actor)} <b>${nm(C.actor)}</b> darf noch klauen · 1 Punkt`;
+ else if(who)turn='Antwort ist eingeloggt.';
+ else if(C.res.p<0){turn='Keiner holt den Punkt.';cls=' miss';}
+ else{turn=`${bib(C.res.p)} <b>${nm(C.res.p)}</b> ${C.res.pts===2?'liegt richtig':'klaut den Punkt'} · +${C.res.pts}`;cls=' hit';}
+ return `<section class="paper">
+ <div class="qhead"><span>${esc(C.name)}</span><span>Frage ${Math.floor(C.turn/N())+1}/${C.per} für ${nm(C.asker)}</span></div>
+ <p class="turn${cls}">${turn}</p>${tape()}
+ <h3 class="qtext">${esc(q.q)}</h3>
+ ${optsHTML(q,!done&&!who,C.elim,done,who?C.pick:-1)}
+ ${who?`<div class="whobox" id="who"><p class="qtext">Wer hat gedrückt?</p><div class="two">${C.cands.map(p=>`<button class="whob p${p}" data-a="who" data-v="${p}">${nm(p)}</button>`).join('')}</div></div>`:''}
+ ${done?`<button class="go" data-a="next">${C.turn>=C.qs.length-1?'Zur Wertung':'Weiter: Frage für '+nm(C.order[(C.turn+1)%N()])}</button>`:''}
+</section>`;
+};
+/* ---------- Schätzen ---------- */
+INIT.est=()=>{
+ C.items=draw('est',EST.length,2).map(i=>{const p=EST[i].split('|');return {q:p[0],a:+p[1],u:p[2]||''};});
+ C.n=0;estStart();
+};
+function estStart(){C.it=C.items[C.n];C.seq=ALL().map(i=>C.order[(i+C.n)%N()]);C.pi=0;C.guess=fill(null);C.val='';C.actor=C.seq[0];C.phase='hand';}
+const pad=()=>`<div class="pad">${[1,2,3,4,5,6,7,8,9].map(d=>`<button data-a="key" data-v="${d}">${d}</button>`).join('')}<button data-a="key" data-v="b" aria-label="Löschen">⌫</button><button data-a="key" data-v="0">0</button><button class="okb" id="okb" data-a="estOk"${C.val?'':' disabled'}>OK</button></div>`;
+const shown=()=>C.val?num(+C.val,C.it.u==='J'?'J':''):'–';
+A.estIn=()=>{C.val='';C.phase='in';render();};
+A.key=v=>{
+ if(!C||C.phase!=='in')return;
+ if(v==='b')C.val=C.val.slice(0,-1);
+ else{if(C.val==='0')C.val='';if(C.val.length<10)C.val+=v;}
+ const d=$('disp'),o=$('okb');
+ if(d)d.textContent=shown();
+ if(o)o.disabled=!C.val;
+};
+A.estOk=()=>{
+ if(!C||C.phase!=='in'||!C.val)return;
+ C.guess[C.actor]=+C.val;C.pi++;
+ if(C.pi<N()){C.actor=C.seq[C.pi];C.phase='hand';}
+ else{
+  const d=C.guess.map(g=>Math.abs(g-C.it.a)),pts=rankPts(d,[3,1,0]);
+  pts.forEach((p,i)=>give(i,p));
+  C.rev={d,pts};C.actor=-1;C.phase='rev';
+ }
+ render();
+};
+A.estNext=()=>{C.n++;if(C.n>=2)return endRound();estStart();render();};
+PLAY.est=()=>{
+ const it=C.it,head=`<div class="qhead"><span>Schätzen</span><span>Frage ${C.n+1}/2</span></div><h3 class="qtext">${esc(it.q)}</h3>`;
+ if(C.phase==='hand')return `<section class="paper">${head}<div class="hand-over">${bib(C.actor,'big')}<p>Handy an <b>${nm(C.actor)}</b>. Die anderen schauen weg.</p></div><button class="go" data-a="estIn">Ich bin ${nm(C.actor)}</button></section>`;
+ if(C.phase==='in')return `<section class="paper">${head}<p class="turn">${bib(C.actor)} <b>${nm(C.actor)}</b> tippt geheim</p><div class="numdisp"><span id="disp">${shown()}</span>${it.u&&it.u!=='J'?` <small>${esc(it.u)}</small>`:''}</div>${pad()}</section>`;
+ const o=ALL().sort((a,b)=>C.rev.d[a]-C.rev.d[b]);
+ return `<section class="paper">${head}
+ <div class="truth"><small>Richtig ist</small><b>${num(it.a,it.u)}</b></div>
+ <div class="rows">${o.map(i=>`<div class="row"><span class="rw">${bib(i)}<span>${nm(i)}</span><small>${C.rev.d[i]===0?'Volltreffer':fmt(C.rev.d[i])+' daneben'}</small></span><b class="tot">${num(C.guess[i],it.u==='J'?'J':'')}</b><b class="plus">+${C.rev.pts[i]}</b></div>`).join('')}</div>
+ <button class="go" data-a="estNext">${C.n<1?'Nächste Schätzfrage':'Zur Wertung'}</button>
+</section>`;
+};
+
+/* ---------- Wahr oder falsch ---------- */
+INIT.wf=()=>{
+ C.per=perW();
+ const idx=draw('wf',WF.length,C.per*N());
+ C.sets=ALL().map(j=>idx.slice(j*C.per,j*C.per+C.per).map(i=>{const p=WF[i].split('|');return {s:p[0],w:p[1]==='w',note:p[2]||''};}));
+ C.pi=0;C.n=0;C.hits=fill(0);C.actor=C.order[0];C.phase='ready';
+};
+A.wfGo=()=>{C.cur=C.sets[C.pi][C.n];C.phase='ask';countdown(7,()=>wfAns(null));render();};
+function wfAns(v){
+ if(!C||C.t!=='wf'||C.phase!=='ask')return;
+ stopClock();
+ const ok=v!==null&&v===C.cur.w;
+ if(ok){give(C.actor,1);C.hits[C.actor]++;}
+ C.fb={ok,late:v===null};C.phase='fb';render();
+}
+A.wf=v=>wfAns(v==='1');
+A.wfNext=()=>{
+ C.n++;
+ if(C.n<C.per)return A.wfGo();
+ C.n=0;C.pi++;
+ if(C.pi>=N()){C.info=C.hits.map(h=>h+' von '+C.per+' richtig');return endRound();}
+ C.actor=C.order[C.pi];C.phase='ready';render();
+};
+PLAY.wf=()=>{
+ const head=`<div class="qhead"><span>Wahr oder falsch</span><span>${nm(C.actor)} · ${C.phase==='ready'?C.per+' Aussagen':'Aussage '+(C.n+1)+'/'+C.per}</span></div>`;
+ if(C.phase==='ready')return `<section class="paper">${head}<div class="hand-over">${bib(C.actor,'big')}<p><b>${nm(C.actor)}</b> ist dran. 7 Sekunden pro Aussage.</p></div><button class="go" data-a="wfGo">Start</button></section>`;
+ const c=C.cur;
+ if(C.phase==='ask')return `<section class="paper">${head}${tape()}<h3 class="qtext">${esc(c.s)}</h3><div class="two"><button class="tf t" data-a="wf" data-v="1">Wahr</button><button class="tf f" data-a="wf" data-v="0">Falsch</button></div></section>`;
+ const lbl=C.n<C.per-1?'Nächste Aussage':(C.pi>=N()-1?'Zur Wertung':'Weiter: '+nm(C.order[C.pi+1])+' ist dran');
+ return `<section class="paper">${head}
+ <p class="turn ${C.fb.ok?'hit':'miss'}">${C.fb.ok?'Richtig · +1':(C.fb.late?'Zeit abgelaufen':'Daneben')}</p>
+ <h3 class="qtext">${esc(c.s)}</h3>
+ <p class="note"><b>${c.w?'Stimmt.':'Stimmt nicht.'}</b> ${esc(c.note)}</p>
+ <button class="go" data-a="wfNext">${lbl}</button>
+</section>`;
+};
+
+/* ---------- Buzzer ---------- */
+INIT.buzz=()=>{
+ const ks=Object.keys(QUIZ);C.qs=[];
+ for(let i=0;i<5;i++){
+  const k=ks[rnd(ks.length)],q=parseQ(QUIZ[k][draw('q.'+k,QUIZ[k].length,1)[0]]);
+  q.cat=DISC.find(d=>d.k===k).n;C.qs.push(q);
+ }
+ C.n=0;C.actor=-1;C.phase='wait';
+};
+A.buzzGo=()=>{C.q=C.qs[C.n];C.out=[];C.elim=[];C.actor=-1;C.res=null;C.phase='open';countdown(15,buzzEnd);render();};
+function buzzEnd(){stopClock();if(!C.res)C.res={p:-1};C.actor=-1;C.phase='done';render();}
+A.buzz=v=>{
+ const p=+v;
+ if(!C||C.t!=='buzz'||C.phase!=='open'||C.out.includes(p))return;
+ C.actor=p;C.phase='answer';countdown(6,()=>buzzAns(-1));render();
+};
+function buzzAns(i){
+ if(C.phase!=='answer'||(i>=0&&C.elim.includes(i)))return;
+ stopClock();
+ if(i>=0&&C.q.opts[i].ok){give(C.actor,2);C.res={p:C.actor};return buzzEnd();}
+ give(C.actor,-1);
+ if(i>=0)C.elim.push(i);
+ C.out.push(C.actor);C.actor=-1;
+ if(C.out.length>=N())return buzzEnd();
+ C.phase='open';countdown(10,buzzEnd);render();
+}
+A.buzzNext=()=>{C.n++;if(C.n>=5)return endRound();A.buzzGo();};
+PLAY.buzz=()=>{
+ if(C.phase==='wait')return `<section class="paper"><div class="qhead"><span>Buzzer</span><span>5 Fragen</span></div><h3 class="qtext">Handy in die Mitte. Jeder legt einen Finger an seinen Buzzer.</h3><button class="go" data-a="buzzGo">Erste Frage</button></section>`;
+ const q=C.q,done=C.phase==='done';let turn,cls='';
+ if(C.phase==='open')turn=C.out.length?'Falsch! Jetzt dürfen die anderen buzzern.':'Wer es weiß: buzzern!';
+ else if(C.phase==='answer')turn=`${bib(C.actor)} <b>${nm(C.actor)}</b> antwortet`;
+ else if(C.res.p<0){turn='Keiner holt die Punkte.';cls=' miss';}
+ else{turn=`${bib(C.res.p)} <b>${nm(C.res.p)}</b> liegt richtig · +2`;cls=' hit';}
+ return `<section class="paper">
+ <div class="qhead"><span>Buzzer · ${esc(q.cat)}</span><span>Frage ${C.n+1}/5</span></div>
+ <p class="turn${cls}">${turn}</p>${tape()}
+ <h3 class="qtext">${esc(q.q)}</h3>
+ ${optsHTML(q,C.phase==='answer',C.elim,done)}
+ ${done?`<button class="go" data-a="buzzNext">${C.n<4?'Nächste Frage':'Zur Wertung'}</button>`:''}
+</section>
+${done?'':`<div class="buzzers">${ALL().map(i=>`<button class="buzz p${i}${C.out.includes(i)?' out':''}${C.actor===i?' hit':''}" data-pd="buzz" data-v="${i}">${nm(i)}</button>`).join('')}</div>`}`;
+};
+
+/* ---------- Reaktion ---------- */
+INIT.reakt=()=>{C.pi=0;C.att=0;C.times=ALL().map(()=>[]);C.actor=C.order[0];C.phase='ready';};
+A.rkGo=()=>{
+ C.phase='wait';render();
+ after(1400+rnd(3200),()=>{C.phase='now';C.t0=performance.now();render();after(3000,()=>rkDone(3000));});
+};
+A.rkTap=()=>{
+ if(!C||C.t!=='reakt')return;
+ if(C.phase==='wait'){stopClock();rkDone(null);}
+ else if(C.phase==='now'){const ms=Math.round(performance.now()-C.t0);stopClock();rkDone(ms);}
+};
+function rkDone(ms){C.times[C.actor].push(ms);C.ms=ms;C.att++;C.phase='res';render();}
+A.rkNext=()=>{
+ if(C.att<2)return A.rkGo();
+ C.att=0;C.pi++;
+ if(C.pi<N()){C.actor=C.order[C.pi];C.phase='ready';return render();}
+ const best=C.times.map(t=>{const v=t.filter(x=>x!==null);return v.length?Math.min(...v):null;});
+ rankPts(best,[4,2,1]).forEach((p,i)=>give(i,p));
+ C.info=best.map(b=>b===null?'zwei Frühstarts':b+' ms');
+ endRound();
+};
+PLAY.reakt=()=>{
+ if(C.phase==='wait'||C.phase==='now')return `<button class="react ${C.phase}" data-pd="rkTap">${C.phase==='wait'?'Warte …':'Jetzt!'}</button>`;
+ const head=`<div class="qhead"><span>Reaktion</span><span>${nm(C.actor)} · Versuch ${C.phase==='res'?C.att:C.att+1}/2</span></div>`;
+ if(C.phase==='ready')return `<section class="paper">${head}<div class="hand-over">${bib(C.actor,'big')}<p><b>${nm(C.actor)}</b> ist dran. Tippe, sobald das Feld grün wird.</p></div><button class="go" data-a="rkGo">Bereit</button></section>`;
+ const lbl=C.att<2?'Zweiter Versuch':(C.pi>=N()-1?'Zur Wertung':'Weiter: '+nm(C.order[C.pi+1])+' ist dran');
+ return `<section class="paper">${head}<div class="truth"><small>${C.ms===null?'Frühstart':'Deine Zeit'}</small><b>${C.ms===null?'ungültig':C.ms+' ms'}</b></div><button class="go" data-a="rkNext">${lbl}</button></section>`;
+};
+
+/* ---------- Punktlandung ---------- */
+INIT.stopp=()=>{C.goal=S.goal;C.pi=0;C.res=fill(null);C.actor=C.order[0];C.phase='ready';};
+A.stGo=()=>{
+ C.phase='run';C.t0=performance.now();render();
+ T.iv=setInterval(()=>{
+  const e=(performance.now()-C.t0)/1000,el=$('clock');
+  if(el)el.textContent=e<3?sec(e):'?,??';
+  if(e>C.goal+15)A.stStop();
+ },40);
+};
+A.stStop=()=>{
+ if(!C||C.t!=='stopp'||C.phase!=='run')return;
+ C.res[C.actor]=(performance.now()-C.t0)/1000;stopClock();C.phase='stopped';render();
+};
+A.stNext=()=>{
+ C.pi++;
+ if(C.pi<N()){C.actor=C.order[C.pi];C.phase='ready';return render();}
+ C.d=C.res.map(e=>Math.round(Math.abs(e-C.goal)*100)/100);
+ C.pts=rankPts(C.d,[4,2,1]);C.pts.forEach((p,i)=>give(i,p));
+ C.actor=-1;C.phase='rev';render();
+};
+A.stEnd=()=>{C.info=C.res.map(e=>sec(e)+' s gestoppt');endRound();};
+PLAY.stopp=()=>{
+ const g=String(C.goal).replace('.',','),head=`<div class="qhead"><span>Punktlandung</span><span>Ziel: ${g} s</span></div>`;
+ if(C.phase==='ready')return `<section class="paper">${head}<div class="hand-over">${bib(C.actor,'big')}<p><b>${nm(C.actor)}</b>: Stoppe bei genau ${g} Sekunden. Nach 3 Sekunden wird die Uhr unsichtbar.</p></div><button class="go" data-a="stGo">Uhr starten</button></section>`;
+ if(C.phase==='run')return `<section class="paper">${head}<div class="clock" id="clock">0,00</div></section><button class="react now" data-pd="stStop">Stopp</button>`;
+ if(C.phase==='stopped')return `<section class="paper">${head}<div class="truth"><small>Gestoppt</small><b>Auflösung am Ende</b></div><button class="go" data-a="stNext">${C.pi<N()-1?'Weiter: '+nm(C.order[C.pi+1])+' ist dran':'Auflösung zeigen'}</button></section>`;
+ const o=ALL().sort((a,b)=>C.d[a]-C.d[b]);
+ return `<section class="paper">${head}
+ <div class="rows">${o.map(i=>`<div class="row"><span class="rw">${bib(i)}<span>${nm(i)}</span><small>${sec(C.d[i])} s daneben</small></span><b class="tot">${sec(C.res[i])} s</b><b class="plus">+${C.pts[i]}</b></div>`).join('')}</div>
+ <button class="go" data-a="stEnd">Zur Wertung</button>
+</section>`;
+};
+
+/* ---------- Ablauf ---------- */
+function endRound(){
+ stopClock();
+ S.last={n:C.name,gain:C.gain,info:C.info};
+ S.recent.push(C.k);S.round++;C=null;
+ S.screen='card';render();
+}
+function newMatch(){
+ stopClock();
+ S.players.forEach(p=>{p.score=0;});
+ S.round=0;S.recent=[];S.last=null;S.spinning=false;C=null;
+ buildBoard();S.screen='wheel';render();
+}
+A.target=v=>{S.target=+v;render();};
+A.count=v=>{S.n=+v;render();};
+A.start=()=>{
+ for(let i=0;i<S.n;i++){const el=$('n'+i);S.names[i]=String(el?el.value:S.names[i]||'').trim().slice(0,12);}
+ store.set(PREF,{names:S.names,target:S.target,n:S.n});
+ S.players=Array.from({length:S.n},(_,i)=>S.names[i]||'').map((n,i)=>({name:n||'Spieler '+(i+1),score:0}));
+ newMatch();
+};
+A.rematch=newMatch;
+A.names=()=>{stopClock();C=null;S.screen='setup';render();};
+A.wheel=()=>{S.screen='wheel';render();};
+A.final=()=>{S.screen='final';render();};
+A.spin=()=>{
+ if(S.spinning)return;
+ S.spinning=true;
+ const ban=S.recent.slice(-4),cand=DISC.filter(d=>!ban.includes(d.k)),pick=cand[rnd(cand.length)];
+ const i=DISC.indexOf(pick),seg=360/DISC.length;
+ S.pick=pick.k;S.goal=5+rnd(13)*.5;
+ S.rot=Math.ceil(S.rot/360)*360+360*5+(360-(i*seg+seg/2))+(Math.random()-.5)*seg*.7;
+ const w=$('wheel'),b=$('spin');
+ if(w)w.style.transform=`rotate(${S.rot}deg)`;
+ if(b)b.disabled=true;
+ after(REDUCED?900:5000,()=>{S.spinning=false;S.screen='intro';render();});
+};
+A.go=()=>{
+ const d=DISC.find(x=>x.k===S.pick);
+ C={t:d.t==='quiz'?'quiz':d.k,k:d.k,name:d.n,order:order(),gain:fill(0),info:fill(''),actor:-1};
+ INIT[C.t]();
+ S.screen='play';render();
+};
+
+let pdAt=0;
+document.addEventListener('pointerdown',e=>{
+ const b=e.target.closest&&e.target.closest('[data-pd]');
+ if(!b)return;
+ e.preventDefault();pdAt=Date.now();
+ A[b.dataset.pd](b.dataset.v);
+});
+document.addEventListener('click',e=>{
+ const b=e.target.closest&&e.target.closest('[data-a]');
+ if(!b||b.disabled||Date.now()-pdAt<350)return;
+ A[b.dataset.a](b.dataset.v);
+});
+document.addEventListener('input',e=>{
+ const i=e.target.dataset&&e.target.dataset.name;
+ if(i!==undefined)S.names[+i]=e.target.value;
+});
+
+// Stand über eine neue Version der Seite retten
+function boot(d){
+ if(d&&Array.isArray(d.players)&&d.players.length>=2){
+  S.players=d.players;S.target=d.target||40;S.round=d.round||0;S.recent=d.recent||[];S.last=d.last||null;
+  buildBoard();
+  S.screen=d.screen==='final'?'final':(d.screen==='card'&&S.last?'card':'wheel');
+ }
+ render();
+}
+const hot=window.claude&&window.claude.hot;
+try{if(hot&&hot.snapshot)hot.snapshot(()=>S.screen==='setup'?{}:{players:S.players,target:S.target,round:S.round,recent:S.recent,last:S.last,screen:S.screen});}catch(e){}
+if(hot&&hot.ready)hot.ready(boot);else boot((hot&&hot.data)||{});
+})();
+</script>
+</body>
+</html>

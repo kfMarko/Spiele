@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1c1418">
+<title>Wasserglas-Staffel</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=DM+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="../common.css">
+<style>
+#glass{width:min(100%,260px);height:300px;display:block;margin:0 auto}
+.holder{font-family:var(--display);font-weight:800;font-size:1.7rem}
+.passbar{width:100%;height:10px;border-radius:99px;background:var(--bg);overflow:hidden}
+.passbar i{display:block;height:100%;background:var(--c0);transition:width .1s linear}
+#btnPass{min-height:110px;font-size:1.25rem;font-family:var(--display)}
+.ml{font-family:var(--display);font-size:1.1rem;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spieleabend</a><span class="label" id="roundLbl"></span></div>
+  <div class="board" id="board" hidden></div>
+
+  <section class="scr card" id="scrSetup">
+    <h1>Wasserglas-Staffel</h1>
+    <p class="muted">Das Handy ist ein randvolles Glas Wasser. Es wandert reihum, flach in der Hand. Jeder muss es innerhalb von 4 Sekunden weitergeben. Wer kippt, ruckelt oder zu langsam ist, verschüttet – der Sensor misst mit. Irgendwann wird die Kartoffel heiß: Wer das Glas dann hält, kassiert 50 ml Strafe. Am Ende gewinnt, wer am wenigsten verschüttet hat.</p>
+    <div id="setup"></div>
+  </section>
+
+  <section class="scr card center" id="scrReady" hidden>
+    <span class="label">Runde <span id="rNo"></span></span>
+    <h2>Handy flach hinlegen, dann starten</h2>
+    <p class="muted">Es beginnt <b id="rFirst"></b>. Ihr sitzt im Kreis und gebt nach links weiter.</p>
+    <p class="hint" id="noSensor" hidden>Kein Bewegungssensor verfügbar. Bitte in Safari auf dem iPhone öffnen und den Zugriff erlauben.</p>
+    <button class="hot" id="btnGo">Glas füllen – los</button>
+  </section>
+
+  <section class="scr card center" id="scrPlay" hidden>
+    <span class="label">Glas hält</span>
+    <div class="holder" id="pHolder"></div>
+    <canvas id="glass" width="520" height="600"></canvas>
+    <div class="ml" id="pMl"></div>
+    <div class="passbar"><i id="pBar"></i></div>
+    <button class="primary" id="btnPass">Weitergeben →</button>
+  </section>
+
+  <section class="scr card center" id="scrRound" hidden>
+    <div class="huge" id="eTitle">Heiß!</div>
+    <p id="eText"></p>
+    <div class="rank" id="eRank"></div>
+    <button class="primary" id="btnNext">Weiter</button>
+  </section>
+
+  <section class="scr card center" id="scrWin" hidden>
+    <span class="label">Ruhigste Hand</span>
+    <div class="big" id="wName"></div>
+    <div class="rank" id="wRank"></div>
+    <button class="primary" id="btnRematch">Revanche</button>
+    <button class="ghost" id="btnNew">Andere Spieler</button>
+  </section>
+</div>
+
+<script src="../common.js"></script>
+<script>
+const { $, show, board, rank } = SA;
+const FULL = 300, PASS_MS = 4000;
+const G = { players: [], rounds: 3, round: 0, holder: 0, water: FULL, end: 0, passEnd: 0, raf: 0, last: 0, tiltX: 0, tiltY: 0, spillRate: 0, slosh: 0, sensor: false, gotEvent: false };
+
+SA.setup($("setup"), {
+  min: 2, max: 6,
+  extra: `<span class="label">Runden</span><div class="seg" id="rnd"><button type="button" data-v="2">2</button><button type="button" data-v="3" class="on">3</button><button type="button" data-v="5">5</button></div>`,
+  onStart(names) {
+    G.players = names.map(n => ({ name: n, spilled: 0 }));
+    G.rounds = +document.querySelector("#rnd .on").dataset.v;
+    G.round = 0; G.holder = Math.floor(Math.random() * names.length);
+    ready();
+  }
+});
+document.querySelectorAll("#rnd button").forEach(b => b.onclick = () => { document.querySelectorAll("#rnd button").forEach(x => x.classList.remove("on")); b.classList.add("on"); });
+
+function drawBoard() { board($("board"), G.players, { active: G.holder, fmt: p => Math.round(p.spilled) + " ml" }); $("roundLbl").textContent = "Runde " + G.round + " von " + G.rounds; }
+
+function ready() {
+  G.round++; $("rNo").textContent = G.round + " von " + G.rounds;
+  $("rFirst").textContent = G.players[G.holder].name;
+  drawBoard(); show("scrReady");
+}
+
+// Sensor: Neigung + Ruckeln
+window.addEventListener("devicemotion", e => {
+  const g = e.accelerationIncludingGravity, a = e.acceleration;
+  if (!g || g.x == null) return;
+  G.gotEvent = true;
+  const horiz = Math.hypot(g.x, g.y), tilt = Math.atan2(horiz, Math.abs(g.z || 0)) * 180 / Math.PI;
+  const jerk = a && a.x != null ? Math.hypot(a.x, a.y, a.z) : 0;
+  G.tiltX = g.x; G.tiltY = g.y;
+  // ml pro Sekunde: ab 12° Neigung und ab 3 m/s² Ruck
+  G.spillRate = Math.max(0, tilt - 12) * 1.3 + Math.max(0, jerk - 3) * 7;
+  G.slosh = Math.min(1, G.slosh * .9 + jerk * .03);
+});
+
+$("btnGo").onclick = async () => {
+  const ok = await SA.motionPermission();
+  G.sensor = ok || !(window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function");
+  SA.audio(); SA.wake();
+  G.water = FULL;
+  G.end = Date.now() + (25 + Math.random() * 35) * 1000; // geheim: 25–60 s
+  G.passEnd = Date.now() + PASS_MS;
+  G.last = performance.now();
+  $("pHolder").textContent = G.players[G.holder].name;
+  show("scrPlay");
+  setTimeout(() => { if (!G.gotEvent) $("noSensor").hidden = false; }, 1500);
+  cancelAnimationFrame(G.raf); G.raf = requestAnimationFrame(frame);
+};
+
+function spill(ml, who) {
+  ml = Math.min(ml, G.water);
+  if (ml <= 0) return;
+  G.water -= ml; G.players[who].spilled += ml;
+}
+
+let lastDrip = 0;
+function frame(t) {
+  const dt = Math.min(.1, (t - G.last) / 1000); G.last = t;
+  const now = Date.now();
+  if (G.spillRate > 0) {
+    spill(G.spillRate * dt, G.holder);
+    if (now - lastDrip > 180) { SA.beep(300 + Math.random() * 200, .03, "sine", .06); lastDrip = now; }
+  }
+  // Zu langsam weitergegeben: 20 ml Strafe und automatisch weiter
+  const pf = (G.passEnd - now) / PASS_MS;
+  $("pBar").style.width = Math.max(0, pf * 100) + "%";
+  $("pBar").style.background = pf < .3 ? "var(--accent)" : "var(--c0)";
+  if (pf <= 0) { spill(20, G.holder); SA.beep(150, .2, "sawtooth"); SA.buzz(200); pass(); }
+  $("pMl").textContent = Math.round(G.water) + " ml im Glas";
+  drawGlass();
+  if (now >= G.end || G.water <= 0) { roundOver(G.water <= 0); return; }
+  G.raf = requestAnimationFrame(frame);
+}
+
+function pass() {
+  G.holder = (G.holder + 1) % G.players.length;
+  G.passEnd = Date.now() + PASS_MS;
+  $("pHolder").textContent = G.players[G.holder].name;
+  drawBoard();
+}
+$("btnPass").onclick = () => { SA.beep(800, .04, "triangle"); pass(); };
+
+const cv = $("glass"), cx = cv.getContext("2d");
+function drawGlass() {
+  const W = cv.width, H = cv.height;
+  cx.clearRect(0, 0, W, H);
+  const top = 40, bot = H - 30, lt = 70, rt = W - 70, lb = 120, rb = W - 120;
+  // Wasser: Oberfläche neigt sich gegen die Handyneigung
+  const level = G.water / FULL, h = (bot - top - 20) * level;
+  const ang = Math.max(-.5, Math.min(.5, -G.tiltX / 12));
+  const wob = Math.sin(performance.now() / 90) * G.slosh * 14;
+  const yMid = bot - h;
+  cx.save();
+  cx.beginPath(); cx.moveTo(lt, top); cx.lineTo(rt, top); cx.lineTo(rb, bot); cx.lineTo(lb, bot); cx.closePath(); cx.clip();
+  if (G.water > 0) {
+    const grad = cx.createLinearGradient(0, yMid, 0, bot); grad.addColorStop(0, "#86D0FF"); grad.addColorStop(1, "#3a7fb8");
+    cx.fillStyle = grad; cx.beginPath();
+    cx.moveTo(0, yMid - ang * W / 2 + wob); cx.lineTo(W, yMid + ang * W / 2 - wob); cx.lineTo(W, H); cx.lineTo(0, H); cx.closePath(); cx.fill();
+  }
+  cx.restore();
+  cx.strokeStyle = "#f3e6d8"; cx.lineWidth = 6; cx.lineJoin = "round";
+  cx.beginPath(); cx.moveTo(lt, top); cx.lineTo(lb, bot); cx.lineTo(rb, bot); cx.lineTo(rt, top); cx.stroke();
+}
+
+function roundOver(empty) {
+  cancelAnimationFrame(G.raf);
+  let txt;
+  if (empty) { $("eTitle").textContent = "Leer!"; txt = "Das Glas ist leer. " + G.players[G.holder].name + " hat den letzten Rest verschüttet."; }
+  else { $("eTitle").textContent = "Heiß!"; G.players[G.holder].spilled += 50; txt = G.players[G.holder].name + " hatte das Glas in der Hand: 50 ml Strafe."; SA.beep(90, .7, "sawtooth", .3); SA.buzz(500); }
+  $("eText").textContent = txt;
+  rank($("eRank"), G.players.map(p => ({ name: p.name, s: Math.round(p.spilled) })).map(p => ({ ...p, neg: -p.s })), { key: "neg", unit: "" });
+  fixRank($("eRank"));
+  drawBoard(); show("scrRound");
+}
+// Rangliste zeigt ml statt negativer Werte
+function fixRank(el) { el.querySelectorAll(".r b:last-child").forEach(b => b.textContent = b.textContent.replace("-", "").trim() + " ml"); }
+
+$("btnNext").onclick = () => {
+  if (G.round >= G.rounds) {
+    const sp = G.players.map(p => Math.round(p.spilled)), m = Math.min(...sp);
+    if (sp.filter(s => s === m).length === 1) {
+      $("wName").textContent = G.players[sp.indexOf(m)].name;
+      rank($("wRank"), G.players.map(p => ({ name: p.name, neg: -Math.round(p.spilled) })), { key: "neg", unit: "" }); fixRank($("wRank"));
+      show("scrWin"); return;
+    }
+    G.rounds++; // Gleichstand: Extrarunde
+  }
+  G.holder = (G.holder + 1) % G.players.length;
+  ready();
+};
+$("btnRematch").onclick = () => { G.players.forEach(p => p.spilled = 0); G.round = 0; G.rounds = +document.querySelector("#rnd .on").dataset.v; ready(); };
+$("btnNew").onclick = () => { $("board").hidden = true; $("roundLbl").textContent = ""; show("scrSetup"); };
+</script>
+</body>
+</html>

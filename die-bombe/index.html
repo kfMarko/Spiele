@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1c1418">
+<title>Die Bombe</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=DM+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="../common.css">
+<style>
+.bomb{width:150px;height:150px;margin:6px auto;position:relative}
+.bomb .body{position:absolute;inset:20px 10px 0 10px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#5a4a52,#141012 70%);box-shadow:0 0 0 3px var(--line)}
+.bomb .fuse{position:absolute;left:96px;top:4px;width:26px;height:26px;border:4px solid var(--tape);border-left:0;border-bottom:0;border-radius:0 20px 0 0}
+.bomb .spark{position:absolute;left:112px;top:-6px;width:16px;height:16px;border-radius:50%;background:radial-gradient(#fff,var(--c0) 40%,var(--accent) 70%,transparent 72%);animation:spark .25s infinite alternate}
+@keyframes spark{to{transform:scale(1.5) rotate(40deg)}}
+.bomb.tick .body{animation:thump var(--sp,1s) infinite}
+@keyframes thump{50%{transform:scale(1.06)}}
+.task{font-family:var(--display);font-weight:600;font-size:1.4rem;line-height:1.3;text-wrap:balance}
+.holder{font-family:var(--display);font-weight:800;font-size:1.8rem}
+#btnPass{min-height:120px;font-size:1.3rem;font-family:var(--display)}
+.boom{background:var(--accent)!important;color:#1c1418}
+.boom .muted{color:#3a1a12}
+.lives{letter-spacing:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spieleabend</a><span class="label" id="roundLbl"></span></div>
+  <div class="board" id="board" hidden></div>
+
+  <section class="scr card" id="scrSetup">
+    <h1>Die Bombe</h1>
+    <p class="muted">Jede Runde gibt es eine Aufgabe, zum Beispiel „Nenne ein Tier“. Wer die Bombe hält, nennt etwas Passendes (nichts doppelt!) und gibt sie weiter. Irgendwann geht sie hoch – keiner weiß wann. Wer sie dann hält, verliert ein Leben. Wer zuletzt noch Leben hat, gewinnt.</p>
+    <div id="setup"></div>
+  </section>
+
+  <section class="scr card center" id="scrReady" hidden>
+    <span class="label">Neue Runde · Aufgabe</span>
+    <p class="task" id="rTask"></p>
+    <p class="muted">Es beginnt: <b id="rFirst"></b></p>
+    <button class="ghost small" id="btnSkip" style="min-height:44px">Andere Aufgabe</button>
+    <button class="hot" id="btnLight">Zünden 🔥</button>
+  </section>
+
+  <section class="scr card center" id="scrPlay" hidden>
+    <div class="bomb tick" id="bomb"><div class="fuse"></div><div class="spark"></div><div class="body"></div></div>
+    <span class="label">Bombe hält</span>
+    <div class="holder" id="pHolder"></div>
+    <p class="task" id="pTask"></p>
+    <button class="primary" id="btnPass">Gesagt – weitergeben</button>
+    <p class="muted small">Wer etwas Doppeltes oder Falsches sagt, muss es nochmal versuchen.</p>
+  </section>
+
+  <section class="scr card center boom" id="scrBoom" hidden>
+    <div class="huge">BUMM!</div>
+    <div class="holder" id="bName"></div>
+    <p id="bText"></p>
+    <button class="primary" id="btnNext">Nächste Runde</button>
+  </section>
+
+  <section class="scr card center" id="scrWin" hidden>
+    <span class="label">Überlebt</span>
+    <div class="big" id="wName"></div>
+    <p class="muted">hat als Einziger noch Leben übrig.</p>
+    <button class="primary" id="btnRematch">Revanche</button>
+    <button class="ghost" id="btnNew">Andere Spieler</button>
+  </section>
+</div>
+
+<script src="../common.js"></script>
+<script src="aufgaben.js"></script>
+<script>
+const { $, show, fresh, board } = SA;
+const G = { players: [], lives: 3, holder: 0, task: "", end: 0, start: 0, iv: 0, nextTick: 0, round: 0 };
+
+SA.setup($("setup"), {
+  min: 2, max: 6,
+  extra: `<span class="label">Leben pro Person</span><div class="seg" id="lv"><button type="button" data-v="2">2</button><button type="button" data-v="3" class="on">3</button><button type="button" data-v="5">5</button></div>`,
+  onStart(names) {
+    G.lives = +document.querySelector("#lv .on").dataset.v;
+    G.players = names.map(n => ({ name: n, lives: G.lives }));
+    G.holder = Math.floor(Math.random() * G.players.length); G.round = 0;
+    ready();
+  }
+});
+document.querySelectorAll("#lv button").forEach(b => b.onclick = () => { document.querySelectorAll("#lv button").forEach(x => x.classList.remove("on")); b.classList.add("on"); });
+
+const alive = () => G.players.map((p, i) => i).filter(i => G.players[i].lives > 0);
+function drawBoard() {
+  board($("board"), G.players, { active: G.holder, out: G.players.map((_, i) => i).filter(i => G.players[i].lives <= 0), fmt: p => p.lives > 0 ? "♥".repeat(p.lives) : "✝" });
+  $("roundLbl").textContent = "Runde " + G.round;
+}
+function nextAlive(i) { const n = G.players.length; for (let k = 1; k <= n; k++) { const j = (i + k) % n; if (G.players[j].lives > 0) return j; } return i; }
+
+function ready() {
+  G.round++;
+  if (G.players[G.holder].lives <= 0) G.holder = nextAlive(G.holder);
+  G.task = fresh("bombe", AUFGABEN, 1)[0];
+  $("rTask").textContent = G.task;
+  $("rFirst").textContent = G.players[G.holder].name;
+  drawBoard(); show("scrReady");
+}
+$("btnSkip").onclick = () => { G.task = fresh("bombe", AUFGABEN, 1)[0]; $("rTask").textContent = G.task; };
+
+$("btnLight").onclick = () => {
+  SA.audio(); SA.wake();
+  const secs = 20 + Math.random() * 45; // 20–65 s, geheim
+  G.start = Date.now(); G.end = G.start + secs * 1000; G.nextTick = 0;
+  $("pTask").textContent = G.task;
+  holderView();
+  show("scrPlay");
+  clearInterval(G.iv);
+  G.iv = setInterval(loop, 50);
+};
+function holderView() { $("pHolder").textContent = G.players[G.holder].name; drawBoard(); }
+
+function loop() {
+  const now = Date.now();
+  if (now >= G.end) { explode(); return; }
+  // Ticken wird schneller, je näher das Ende – aber erst in der letzten Phase deutlich
+  const frac = (now - G.start) / (G.end - G.start);
+  const gap = frac < .6 ? 700 : frac < .85 ? 420 : 200;
+  $("bomb").style.setProperty("--sp", gap * 1.4 + "ms");
+  if (now >= G.nextTick) { SA.beep(frac < .85 ? 1400 : 1800, .03, "square", .08); G.nextTick = now + gap; }
+}
+$("btnPass").onclick = () => {
+  if (Date.now() >= G.end) return;
+  G.holder = nextAlive(G.holder); SA.beep(700, .04, "triangle"); holderView();
+};
+
+function explode() {
+  clearInterval(G.iv);
+  SA.beep(80, .9, "sawtooth", .35); SA.buzz(600);
+  const p = G.players[G.holder];
+  p.lives--;
+  $("bName").textContent = p.name;
+  $("bText").textContent = p.lives > 0 ? "verliert ein Leben – noch " + p.lives + " übrig." : "ist raus!";
+  drawBoard();
+  const left = alive();
+  if (left.length === 1) {
+    setTimeout(() => { $("wName").textContent = G.players[left[0]].name; show("scrWin"); }, 2200);
+    $("btnNext").hidden = true;
+  } else $("btnNext").hidden = false;
+  show("scrBoom");
+}
+$("btnNext").onclick = () => ready();
+$("btnRematch").onclick = () => { G.players.forEach(p => p.lives = G.lives); G.round = 0; ready(); };
+$("btnNew").onclick = () => { $("board").hidden = true; $("roundLbl").textContent = ""; show("scrSetup"); };
+</script>
+</body>
+</html>

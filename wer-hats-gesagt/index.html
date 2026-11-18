@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1c1418">
+<title>Wer hat's gesagt?</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=DM+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="../common.css">
+<style>
+.quote{font-family:var(--display);font-weight:600;font-size:1.35rem;line-height:1.35;text-wrap:balance;position:relative;padding:8px 6px 0}
+.quote::before{content:"„";position:absolute;left:-6px;top:-22px;font-size:4rem;color:var(--accent);font-family:Georgia,serif}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opts button{text-align:left;font-weight:600}
+.opts button.ok{background:var(--ok);color:#10200f;border-color:var(--ok)}
+.opts button.no{background:transparent;opacity:.45;text-decoration:line-through}
+.steal{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.steal button{border-bottom:4px solid var(--pc)}
+.tag{display:inline-block;font-size:.75rem;padding:3px 10px;border-radius:99px;border:1px solid var(--line);color:var(--muted);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spieleabend</a><span class="label" id="roundLbl"></span></div>
+  <div class="board" id="board" hidden></div>
+
+  <section class="scr card" id="scrSetup">
+    <h1>Wer hat's gesagt?</h1>
+    <p class="muted">Ein berühmter Satz aus Film, Serie, Sport, Geschichte, Musik oder Werbung – und vier Namen. Wer dran ist, tippt eine Antwort: richtig = 2 Punkte. Liegt er falsch, dürfen die anderen klauen: Wer zuerst „Ich!“ ruft, wird angetippt und hat einen Versuch für 1 Punkt.</p>
+    <div id="setup"></div>
+  </section>
+
+  <section class="scr card" id="scrQ" hidden>
+    <div class="top"><span class="chip" id="qWho"></span><span class="tag" id="qCat"></span></div>
+    <p class="quote" id="qText"></p>
+    <div class="opts" id="opts"></div>
+    <div id="stealBox" hidden style="display:flex;flex-direction:column;gap:8px">
+      <p class="label">Falsch! Wer klaut? (Wer zuerst „Ich!“ ruft)</p>
+      <div class="steal" id="steal"></div>
+      <button class="ghost" id="btnNoSteal">Keiner weiß es</button>
+    </div>
+    <p class="big" id="qRes" style="font-size:1.15rem" hidden></p>
+    <button class="primary" id="btnNext" hidden>Weiter</button>
+  </section>
+
+  <section class="scr card center" id="scrWin" hidden>
+    <span class="label">Gewonnen</span>
+    <div class="big" id="wName"></div>
+    <div class="rank" id="wRank"></div>
+    <button class="primary" id="btnRematch">Revanche</button>
+    <button class="ghost" id="btnNew">Andere Spieler</button>
+  </section>
+</div>
+
+<script src="../common.js"></script>
+<script src="zitate.js"></script>
+<script>
+const { $, esc, shuffle, show, fresh, board, rank } = SA;
+const G = { players: [], target: 12, turn: 0, round: 1, q: null, answerer: -1, phase: "main" };
+
+SA.setup($("setup"), {
+  min: 2, max: 6,
+  extra: `<span class="label">Spiel geht bis</span><div class="seg" id="tgt"><button type="button" data-t="10">10</button><button type="button" data-t="16" class="on">16</button><button type="button" data-t="24">24</button></div>`,
+  onStart(names) {
+    G.players = names.map(n => ({ name: n, score: 0 }));
+    G.target = +document.querySelector("#tgt .on").dataset.t;
+    G.turn = 0; G.round = 1; ask();
+  }
+});
+document.querySelectorAll("#tgt button").forEach(b => b.onclick = () => { document.querySelectorAll("#tgt button").forEach(x => x.classList.remove("on")); b.classList.add("on"); });
+
+function drawBoard(a = -1) { board($("board"), G.players, { active: a }); $("roundLbl").textContent = "Runde " + G.round + " · bis " + G.target; }
+
+function ask() {
+  const [line] = fresh("zitate", ZITATE, 1);
+  const [cat, text, right, ...wrong] = line.split("|");
+  G.q = { cat, text, right, opts: shuffle([right, ...wrong]) };
+  G.answerer = G.turn; G.phase = "main";
+  $("qWho").className = "chip pc" + G.turn; $("qWho").textContent = G.players[G.turn].name + " ist dran";
+  $("qCat").textContent = cat; $("qText").textContent = text;
+  $("opts").innerHTML = G.q.opts.map((o, i) => `<button data-i="${i}">${esc(o)}</button>`).join("");
+  $("opts").querySelectorAll("button").forEach(b => b.onclick = () => answer(b));
+  $("stealBox").hidden = true; $("qRes").hidden = true; $("btnNext").hidden = true;
+  drawBoard(G.turn); show("scrQ");
+}
+
+function lockAll() { $("opts").querySelectorAll("button").forEach(b => b.disabled = true); }
+function showRight() { $("opts").querySelectorAll("button").forEach(b => { if (G.q.opts[+b.dataset.i] === G.q.right) b.classList.add("ok"); }); }
+function result(txt, good) { $("qRes").textContent = txt; $("qRes").style.color = good ? "var(--ok)" : "var(--bad)"; $("qRes").hidden = false; $("btnNext").hidden = false; drawBoard(); }
+
+function answer(btn) {
+  const pick = G.q.opts[+btn.dataset.i];
+  if (pick === G.q.right) {
+    lockAll(); showRight(); SA.beep(1200, .12, "triangle");
+    const pts = G.phase === "main" ? 2 : 1;
+    G.players[G.answerer].score += pts;
+    result(G.players[G.answerer].name + " +" + pts, true);
+    return;
+  }
+  btn.classList.add("no"); btn.disabled = true; SA.beep(200, .15, "sawtooth");
+  if (G.phase === "main") {
+    G.phase = "steal";
+    lockAll();
+    $("steal").innerHTML = G.players.map((p, i) => i === G.turn ? "" : `<button class="pc${i}" data-i="${i}">${esc(p.name)}</button>`).join("");
+    $("steal").querySelectorAll("button").forEach(b => b.onclick = () => {
+      G.answerer = +b.dataset.i; $("stealBox").hidden = true;
+      $("qWho").className = "chip pc" + G.answerer; $("qWho").textContent = G.players[G.answerer].name + " klaut";
+      $("opts").querySelectorAll("button:not(.no)").forEach(x => x.disabled = false);
+      drawBoard(G.answerer);
+    });
+    $("stealBox").hidden = false;
+  } else {
+    lockAll(); showRight(); result("Daneben – keiner kriegt Punkte", false);
+  }
+}
+$("btnNoSteal").onclick = () => { $("stealBox").hidden = true; showRight(); result("Keiner wusste es", false); };
+
+$("btnNext").onclick = () => {
+  G.turn++;
+  if (G.turn >= G.players.length) {
+    G.turn = 0;
+    const sc = G.players.map(p => p.score), m = Math.max(...sc);
+    if (m >= G.target && sc.filter(s => s === m).length === 1) {
+      $("wName").textContent = G.players[sc.indexOf(m)].name; rank($("wRank"), G.players); drawBoard(); show("scrWin"); return;
+    }
+    G.round++;
+  }
+  ask();
+};
+$("btnRematch").onclick = () => { G.players.forEach(p => p.score = 0); G.turn = 0; G.round = 1; ask(); };
+$("btnNew").onclick = () => { $("board").hidden = true; $("roundLbl").textContent = ""; show("scrSetup"); };
+</script>
+</body>
+</html>
