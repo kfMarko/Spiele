@@ -43,6 +43,7 @@
     <div id="wheel"></div>
     <p class="big" id="tCat" style="font-size:1.3rem;min-height:1.5em"></p>
     <button class="hot" id="btnSpin">Kategorie drehen</button>
+    <button class="ghost" id="btnMix">🎲 Mix aus allen Kategorien</button>
     <button class="primary" id="btnGo" hidden>Handy an die Stirn – Start</button>
     <p class="muted small" id="tHint">Quer an die Stirn halten, Bildschirm zu den anderen. Nach oben kippen = richtig, nach unten = weiter. Ohne Sensor: rechte Hälfte tippen = richtig, linke = weiter.</p>
     <button class="ghost small" id="btnFlipDir" style="min-height:40px;padding:6px 12px">Kipprichtung vertauscht? Hier tauschen</button>
@@ -79,11 +80,12 @@
 <script>
 const { $, esc, show, fresh, board, rank } = SA;
 const CATS = Object.keys(KATEGORIEN);
+const MIX = "Mix";
 const POOL = Object.fromEntries(CATS.map(c => [c, KATEGORIEN[c].split(",").map(s => s.trim())]));
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 let dirFlip = SA.store.get("sa.stirn.flip", false);
 
-const G = { players: [], rounds: 3, secs: 60, round: 1, turn: 0, cat: null, words: [], wi: 0, log: [], t: 0, iv: 0, neutral: true, motion: false };
+const G = { players: [], rounds: 3, secs: 60, round: 1, turn: 0, cat: null, word: "", log: [], t: 0, iv: 0, neutral: true, motion: false };
 const wheel = SA.wheel($("wheel"), CATS);
 
 SA.setup($("setup"), {
@@ -105,24 +107,28 @@ function nextTurn() {
   drawBoard(G.turn);
   $("tName").textContent = G.players[G.turn].name;
   $("tCat").textContent = ""; G.cat = null;
-  $("btnSpin").hidden = false; $("btnSpin").disabled = false; $("btnGo").hidden = true;
+  $("btnSpin").hidden = false; $("btnSpin").disabled = false; $("btnMix").hidden = false; $("btnGo").hidden = true;
   show("scrTurn");
 }
 $("btnSpin").onclick = async () => {
-  $("btnSpin").disabled = true; SA.audio();
+  $("btnSpin").disabled = true; $("btnMix").hidden = true; SA.audio();
   const i = await wheel.spin();
   G.cat = CATS[i]; $("tCat").textContent = G.cat;
   $("btnSpin").hidden = true; $("btnGo").hidden = false;
+};
+$("btnMix").onclick = () => {
+  SA.audio();
+  G.cat = MIX; $("tCat").textContent = "Mix aus allen Kategorien";
+  $("btnSpin").hidden = true; $("btnMix").hidden = true; $("btnGo").hidden = false;
 };
 $("btnFlipDir").onclick = () => { dirFlip = !dirFlip; SA.store.set("sa.stirn.flip", dirFlip); $("btnFlipDir").textContent = "Kipprichtung getauscht ✓"; };
 
 $("btnGo").onclick = async () => {
   G.motion = await SA.motionPermission() || !(window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function");
   SA.wake();
-  G.words = fresh("stirn." + G.cat, POOL[G.cat], 40);
-  G.wi = 0; G.log = [];
+  G.word = ""; G.log = [];
   $("play").hidden = false; $("play").className = G.rot ? "rot" : "";
-  $("pCat").textContent = G.cat;
+  $("pCat").textContent = G.cat === MIX ? "Mix" : G.cat;
   // Countdown, damit man das Handy an die Stirn halten kann
   let c = 3; $("pWord").textContent = c; $("pTime").textContent = "Handy an die Stirn!";
   G.active = false;
@@ -145,14 +151,15 @@ function startClock() {
   }, 250);
 }
 function showWord() {
-  if (G.wi >= G.words.length) G.words = G.words.concat(fresh("stirn." + G.cat, POOL[G.cat], 40));
-  $("pWord").textContent = G.words[G.wi];
+  // Nur angezeigte Begriffe gelten als gesehen – so wiederholt sich lange nichts
+  const cat = G.cat === MIX ? SA.pick(CATS) : G.cat;
+  G.word = fresh("stirn." + cat, POOL[cat], 1)[0];
+  $("pWord").textContent = G.word;
   $("play").className = G.rot ? "rot" : "";
 }
 function mark(ok) {
   if (!G.active) return;
-  G.log.push({ w: G.words[G.wi], ok });
-  G.wi++;
+  G.log.push({ w: G.word, ok });
   $("play").className = (ok ? "ok" : "pass") + (G.rot ? " rot" : "");
   ok ? SA.beep(1200, .12, "triangle") : SA.beep(300, .12, "sawtooth");
   SA.buzz(ok ? 60 : 150);
