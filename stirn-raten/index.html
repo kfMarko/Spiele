@@ -10,6 +10,10 @@
 <link rel="stylesheet" href="../common.css">
 <style>
 #play{position:fixed;inset:0;z-index:50;background:var(--deck);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));text-align:center;transition:background .15s}
+#pInner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;pointer-events:none;position:relative;z-index:1}
+#play.rot #pInner{position:absolute;left:50%;top:50%;width:90vh;height:90vw;margin:0}
+#play.rot .word{font-size:clamp(2.2rem,11vh,6rem)}
+#play.rot .legend{display:none}
 #play.ok{background:#2f7a3c} #play.pass{background:#9a5a1f}
 #play .word{font-family:var(--display);font-weight:800;font-size:clamp(2.2rem,11vw,5rem);line-height:1.05;word-break:break-word;text-wrap:balance}
 #play .time{font-family:var(--display);font-size:1.6rem;font-variant-numeric:tabular-nums}
@@ -29,7 +33,7 @@
 
   <section class="scr card" id="scrSetup">
     <h1>Stirn-Raten</h1>
-    <p class="muted">Einer hält das Handy an die Stirn, Bildschirm nach außen. Die anderen erklären den Begriff. Erraten → Handy nach unten kippen. Passen → nach oben kippen. Jeder richtige Begriff = 1 Punkt.</p>
+    <p class="muted">Einer hält das Handy an die Stirn, Bildschirm nach außen. Die anderen erklären den Begriff. Handy quer halten. Erraten → nach oben kippen. Passen → nach unten kippen. Jeder richtige Begriff = 1 Punkt.</p>
     <div id="setup"></div>
   </section>
 
@@ -40,7 +44,7 @@
     <p class="big" id="tCat" style="font-size:1.3rem;min-height:1.5em"></p>
     <button class="hot" id="btnSpin">Kategorie drehen</button>
     <button class="primary" id="btnGo" hidden>Handy an die Stirn – Start</button>
-    <p class="muted small" id="tHint">Querformat halten, Bildschirm zu den anderen. Ohne Sensor: rechte Hälfte tippen = richtig, linke = weiter.</p>
+    <p class="muted small" id="tHint">Quer an die Stirn halten, Bildschirm zu den anderen. Nach oben kippen = richtig, nach unten = weiter. Ohne Sensor: rechte Hälfte tippen = richtig, linke = weiter.</p>
     <button class="ghost small" id="btnFlipDir" style="min-height:40px;padding:6px 12px">Kipprichtung vertauscht? Hier tauschen</button>
   </section>
 
@@ -61,9 +65,11 @@
 </div>
 
 <div id="play" hidden>
-  <span class="cat" id="pCat"></span>
-  <div class="word" id="pWord"></div>
-  <div class="time" id="pTime"></div>
+  <div id="pInner">
+    <span class="cat" id="pCat"></span>
+    <div class="word" id="pWord"></div>
+    <div class="time" id="pTime"></div>
+  </div>
   <div class="taps"><button id="tapPass" aria-label="Weiter"></button><button id="tapOk" aria-label="Richtig"></button></div>
   <div class="legend"><span>◀ Tipp: weiter</span><span>richtig: Tipp ▶</span></div>
 </div>
@@ -115,7 +121,7 @@ $("btnGo").onclick = async () => {
   SA.wake();
   G.words = fresh("stirn." + G.cat, POOL[G.cat], 40);
   G.wi = 0; G.log = [];
-  $("play").hidden = false; $("play").className = "";
+  $("play").hidden = false; $("play").className = G.rot ? "rot" : "";
   $("pCat").textContent = G.cat;
   // Countdown, damit man das Handy an die Stirn halten kann
   let c = 3; $("pWord").textContent = c; $("pTime").textContent = "Handy an die Stirn!";
@@ -141,13 +147,13 @@ function startClock() {
 function showWord() {
   if (G.wi >= G.words.length) G.words = G.words.concat(fresh("stirn." + G.cat, POOL[G.cat], 40));
   $("pWord").textContent = G.words[G.wi];
-  $("play").className = "";
+  $("play").className = G.rot ? "rot" : "";
 }
 function mark(ok) {
   if (!G.active) return;
   G.log.push({ w: G.words[G.wi], ok });
   G.wi++;
-  $("play").className = ok ? "ok" : "pass";
+  $("play").className = (ok ? "ok" : "pass") + (G.rot ? " rot" : "");
   ok ? SA.beep(1200, .12, "triangle") : SA.beep(300, .12, "sawtooth");
   SA.buzz(ok ? 60 : 150);
   G.active = false;
@@ -159,13 +165,25 @@ $("tapPass").onclick = () => mark(false);
 window.addEventListener("devicemotion", e => {
   if ($("play").hidden) return;
   const a = e.accelerationIncludingGravity; if (!a || a.z == null) return;
+  // Querformat erzwingen: Ist die Seite hochkant (Ausrichtungssperre), aber das Handy liegt quer, Wort drehen
+  if (a.x != null && a.y != null) {
+    const gx = a.x * (isIOS ? -1 : 1);
+    if (window.innerHeight > window.innerWidth && Math.abs(a.x) > Math.abs(a.y) + 2) setRot(gx > 0 ? 90 : -90);
+    else if (Math.abs(a.y) > Math.abs(a.x) + 2 || window.innerWidth >= window.innerHeight) setRot(0);
+  }
   // s > 0: Bildschirm zeigt nach oben, s < 0: Bildschirm zeigt nach unten
   let s = a.z * (isIOS ? -1 : 1) * (dirFlip ? -1 : 1);
   if (Math.abs(s) < 3.5) { G.neutral = true; return; }
   if (!G.neutral || !G.active) return;
-  if (s < -6.5) { G.neutral = false; mark(true); }
-  else if (s > 6.5) { G.neutral = false; mark(false); }
+  if (s > 6.5) { G.neutral = false; mark(true); }
+  else if (s < -6.5) { G.neutral = false; mark(false); }
 });
+
+function setRot(d) {
+  if (G.rot === d) return; G.rot = d;
+  $("play").classList.toggle("rot", d !== 0);
+  $("pInner").style.transform = d ? "translate(-50%,-50%) rotate(" + d + "deg)" : "";
+}
 
 function finish() {
   clearInterval(G.iv); G.active = false;
