@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1c1418">
+<title>Wortkarte</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=DM+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="../common.css">
+<style>
+.cats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;width:100%}
+.cats button{min-height:48px;padding:8px;font-size:.92rem}
+.or{display:flex;align-items:center;gap:10px;width:100%;color:var(--muted);font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.who{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;font-size:1.05rem}
+.arrow{color:var(--muted)}
+/* Karte zum Aufdecken */
+.flip{perspective:1000px;width:min(100%,320px,52vh);aspect-ratio:4/5;margin:4px auto;cursor:pointer}
+.flip .in{position:relative;width:100%;height:100%;transition:transform .6s cubic-bezier(.2,.7,.2,1);transform-style:preserve-3d}
+.flip.open .in{transform:rotateY(180deg)}
+.flip .face{position:absolute;inset:0;border-radius:22px;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;text-align:center}
+.flip .cover{background:repeating-linear-gradient(45deg,var(--pc) 0 14px,color-mix(in srgb,var(--pc) 70%,#000) 14px 28px);border:6px solid var(--fg);color:#1c1418}
+.flip .cover b{background:var(--fg);color:#1c1418;padding:10px 16px;border-radius:12px;font-family:var(--display);font-size:1.05rem}
+.flip .front{background:var(--fg);color:#1c1418;transform:rotateY(180deg);border:6px solid var(--pc)}
+.flip .front .label{color:#6b5a50}
+.flip .front .word{font-family:var(--display);font-weight:800;font-size:clamp(1.6rem,9vw,2.6rem);line-height:1.1;word-break:break-word;text-wrap:balance}
+.timer{font-family:var(--display);font-size:4.2rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.timer.low{color:var(--bad)}
+.bar{width:100%;height:10px;border-radius:6px;background:var(--bg);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--pc,var(--accent));width:100%;transition:width .25s linear}
+.wordsmall{font-family:var(--display);font-size:1.5rem;font-weight:800;background:var(--fg);color:#1c1418;border-radius:14px;padding:12px 16px;width:100%;word-break:break-word}
+.res{font-size:3rem;line-height:1}
+.order{display:flex;flex-direction:column;gap:6px;width:100%;text-align:left}
+.order div{display:flex;align-items:center;gap:8px;background:var(--bg);border-radius:10px;padding:8px 12px;font-size:.95rem}
+.order div.done{opacity:.45}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="../">← Spieleabend</a><span class="label" id="roundLbl"></span></div>
+  <div class="board" id="board" hidden></div>
+
+  <section class="scr card" id="scrSetup">
+    <h1>Wortkarte</h1>
+    <p class="muted">Jeder bekommt eine Karte – aber immer für jemand anderen. Das Spiel lost aus, wer wessen Karte zieht. Du deckst sie auf, erklärst das Wort, und dein Partner muss es erraten, bevor die Zeit abläuft. Je schneller erraten, desto mehr Punkte: im ersten Drittel der Zeit 3, im zweiten 2, danach 1 Punkt für den Rater. Wer erklärt, bekommt 1 Punkt.</p>
+    <div id="setup"></div>
+  </section>
+
+  <section class="scr card center" id="scrCat" hidden>
+    <span class="label" id="cRound"></span>
+    <h2>Welche Kategorie?</h2>
+    <div id="wheel"></div>
+    <button class="hot" id="btnSpin">Rad drehen</button>
+    <div class="or">oder</div>
+    <button class="ghost" id="btnMix">🎲 Mix aus allen Kategorien</button>
+    <div class="cats" id="cats"></div>
+  </section>
+
+  <section class="scr card center" id="scrPlan" hidden>
+    <span class="label">Kategorie</span>
+    <div class="big" id="pCat"></div>
+    <p class="muted small">So ist ausgelost, wer wessen Karte bekommt:</p>
+    <div class="order" id="pOrder"></div>
+    <button class="primary" id="btnPlan">Los geht's</button>
+  </section>
+
+  <section class="scr card center" id="scrPass" hidden>
+    <span class="label">Handy weitergeben an</span>
+    <div class="big chip" id="sHolder"></div>
+    <div class="who"><span>Du hast die Karte für</span><b class="chip" id="sGuesser"></b></div>
+    <p class="hint" id="sWarn"></p>
+    <div class="flip" id="flip">
+      <div class="in">
+        <div class="face cover"><b>Antippen zum Aufdecken</b></div>
+        <div class="face front"><span class="label" id="fCat"></span><div class="word" id="fWord"></div><span class="label" id="fFor"></span></div>
+      </div>
+    </div>
+    <button class="ghost small" id="btnSwap" hidden style="min-height:42px;padding:6px 12px">Kenn ich nicht – anderes Wort (1×)</button>
+    <button class="primary" id="btnStart" hidden></button>
+  </section>
+
+  <section class="scr card center" id="scrPlay" hidden>
+    <div class="who"><b class="chip" id="gHolder"></b><span class="arrow">erklärt →</span><b class="chip" id="gGuesser"></b><span class="arrow">rät</span></div>
+    <div class="timer" id="gTime"></div>
+    <div class="bar"><i id="gBar"></i></div>
+    <div class="wordsmall" id="gWord"></div>
+    <p class="muted small">Erklären, umschreiben, vorspielen – nur das Wort selbst (und Teile davon) nicht sagen.</p>
+    <button class="okb" id="btnGot">✓ Erraten!</button>
+    <button class="ghost" id="btnGive">Aufgeben</button>
+  </section>
+
+  <section class="scr card center" id="scrRes" hidden>
+    <div class="res" id="rIcon"></div>
+    <div class="big" id="rHead"></div>
+    <p class="muted" id="rText"></p>
+    <button class="primary" id="btnNext">Weiter</button>
+  </section>
+
+  <section class="scr card center" id="scrWin" hidden>
+    <span class="label">Gewonnen</span>
+    <div class="big" id="wName"></div>
+    <div class="rank" id="wRank"></div>
+    <button class="primary" id="btnRematch">Revanche</button>
+    <button class="ghost" id="btnNew">Andere Spieler</button>
+  </section>
+</div>
+
+<script src="../common.js"></script>
+<script src="../stirn-raten/begriffe.js"></script>
+<script src="woerter.js"></script>
+<script>
+const { $, esc, show, fresh, board, rank, shuffle, pick } = SA;
+const split = s => s.split(",").map(x => x.trim()).filter(Boolean);
+const POOL = {};
+Object.keys(KARTEN).forEach(k => POOL[k] = split(KARTEN[k]));
+["Tiere", "Berufe", "Marken", "Filme & Serien"].forEach(k => { if (KATEGORIEN[k]) POOL[k] = split(KATEGORIEN[k]); });
+const CATS = Object.keys(POOL);
+const MIX = "Mix";
+const mm = s => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+
+const G = { players: [], rounds: 3, secs: 90, round: 1, cat: null, pairs: [], pi: 0, word: "", wcat: "", swapped: false, iv: 0, end: 0 };
+const wheel = SA.wheel($("wheel"), CATS);
+$("cats").innerHTML = CATS.map(c => `<button type="button" data-c="${esc(c)}">${esc(c)}</button>`).join("");
+
+SA.setup($("setup"), {
+  min: 2, max: 6,
+  extra: `<span class="label">Zeit zum Erraten</span><div class="seg" id="sec"><button type="button" data-v="60">1:00</button><button type="button" data-v="90" class="on">1:30</button><button type="button" data-v="120">2:00</button><button type="button" data-v="150">2:30</button></div>
+  <span class="label">Runden (jeder erklärt und rät pro Runde einmal)</span><div class="seg" id="rnd"><button type="button" data-v="2">2</button><button type="button" data-v="3" class="on">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5">5</button></div>`,
+  onStart(names) {
+    G.players = names.map(n => ({ name: n, score: 0 }));
+    G.secs = +document.querySelector("#sec .on").dataset.v;
+    G.rounds = +document.querySelector("#rnd .on").dataset.v;
+    G.round = 1; startRound();
+  }
+});
+["sec", "rnd"].forEach(id => document.querySelectorAll("#" + id + " button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#" + id + " button").forEach(x => x.classList.remove("on")); b.classList.add("on");
+}));
+
+function drawBoard(hl = []) {
+  board($("board"), G.players);
+  [...$("board").children].forEach((el, i) => el.classList.toggle("on", hl.includes(i)));
+  $("roundLbl").textContent = "Runde " + G.round + " von " + G.rounds;
+}
+const chip = i => `<span class="chip pc${i}">${esc(G.players[i].name)}</span>`;
+
+// Auslosen: jeder bekommt die Karte für genau einen anderen, niemand für sich selbst
+function deal(n) {
+  let t;
+  do { t = shuffle([...Array(n).keys()]); } while (t.some((x, i) => x === i));
+  return shuffle(t.map((g, h) => ({ h, g })));
+}
+
+// ---- Kategorie
+function startRound() {
+  drawBoard();
+  $("cRound").textContent = "Runde " + G.round + " von " + G.rounds;
+  $("btnSpin").disabled = false;
+  document.querySelectorAll("#scrCat button").forEach(b => b.disabled = false);
+  show("scrCat");
+}
+function chooseCat(c) {
+  G.cat = c;
+  G.pairs = deal(G.players.length); G.pi = 0;
+  $("pCat").textContent = c === MIX ? "Mix aus allen" : c;
+  $("pOrder").innerHTML = G.pairs.map(p => `<div>${chip(p.h)}<span class="arrow">hat die Karte für</span>${chip(p.g)}</div>`).join("");
+  show("scrPlan");
+}
+$("btnSpin").onclick = async () => {
+  SA.audio();
+  document.querySelectorAll("#scrCat button").forEach(b => b.disabled = true);
+  const i = await wheel.spin();
+  SA.beep(900, .12, "triangle");
+  setTimeout(() => chooseCat(CATS[i]), 700);
+};
+$("btnMix").onclick = () => { SA.audio(); chooseCat(MIX); };
+$("cats").onclick = e => { const b = e.target.closest("button[data-c]"); if (b) { SA.audio(); chooseCat(b.dataset.c); } };
+$("btnPlan").onclick = () => nextCard();
+
+// ---- Karte ziehen
+function drawWord() {
+  G.wcat = G.cat === MIX ? pick(CATS) : G.cat;
+  G.word = fresh("karte." + G.wcat, POOL[G.wcat], 1)[0];
+  $("fCat").textContent = G.wcat;
+  $("fWord").textContent = G.word;
+}
+function nextCard() {
+  const p = G.pairs[G.pi];
+  drawBoard([p.h]);
+  $("sHolder").className = "big chip pc" + p.h; $("sHolder").textContent = G.players[p.h].name;
+  $("sGuesser").className = "chip pc" + p.g; $("sGuesser").textContent = G.players[p.g].name;
+  $("sWarn").textContent = G.players[p.g].name + " darf jetzt nicht aufs Handy schauen!";
+  $("flip").className = "flip pc" + p.h;
+  $("fFor").textContent = "für " + G.players[p.g].name;
+  $("btnSwap").hidden = true; $("btnStart").hidden = true;
+  G.swapped = false;
+  drawWord();
+  show("scrPass");
+}
+$("flip").onclick = () => {
+  if ($("flip").classList.contains("open")) return;
+  SA.audio(); SA.beep(700, .06, "triangle");
+  $("flip").classList.add("open");
+  const p = G.pairs[G.pi];
+  $("btnSwap").hidden = false; $("btnSwap").disabled = false; $("btnSwap").textContent = "Kenn ich nicht – anderes Wort (1×)";
+  $("btnStart").hidden = false; $("btnStart").textContent = "Start – " + G.players[p.g].name + " rät";
+};
+$("btnSwap").onclick = () => {
+  if (G.swapped) return;
+  G.swapped = true; drawWord();
+  $("btnSwap").disabled = true; $("btnSwap").textContent = "Wort getauscht";
+};
+
+// ---- Raten
+$("btnStart").onclick = () => {
+  const p = G.pairs[G.pi];
+  SA.wake();
+  $("gHolder").className = "chip pc" + p.h; $("gHolder").textContent = G.players[p.h].name;
+  $("gGuesser").className = "chip pc" + p.g; $("gGuesser").textContent = G.players[p.g].name;
+  $("gWord").textContent = G.word;
+  $("scrPlay").className = "scr card center pc" + p.h;
+  G.end = Date.now() + G.secs * 1000;
+  tick(); G.iv = setInterval(tick, 250);
+  SA.beep(1000, .15);
+  show("scrPlay");
+};
+let lastBeep = -1;
+function tick() {
+  const ms = Math.max(0, G.end - Date.now()), left = Math.ceil(ms / 1000);
+  $("gTime").textContent = mm(left);
+  $("gTime").classList.toggle("low", left <= 10);
+  $("gBar").style.width = (ms / (G.secs * 1000) * 100) + "%";
+  if (left <= 10 && left > 0 && left !== lastBeep) { lastBeep = left; SA.beep(500, .05); }
+  if (ms <= 0) result(false, true);
+}
+function result(ok, timeout = false) {
+  clearInterval(G.iv); lastBeep = -1;
+  const p = G.pairs[G.pi], used = Math.round((G.secs * 1000 - Math.max(0, G.end - Date.now())) / 1000);
+  if (ok) {
+    const pts = used <= G.secs / 3 ? 3 : used <= G.secs * 2 / 3 ? 2 : 1;
+    G.players[p.g].score += pts; G.players[p.h].score += 1;
+    SA.beep(1200, .12, "triangle"); setTimeout(() => SA.beep(1600, .15, "triangle"), 130); SA.buzz(60);
+    $("rIcon").textContent = "🎉";
+    $("rHead").textContent = "Erraten in " + mm(used) + "!";
+    $("rText").innerHTML = `Das Wort war <b>${esc(G.word)}</b>. ${chip(p.g)} bekommt ${pts} ${pts === 1 ? "Punkt" : "Punkte"}, ${chip(p.h)} 1 Punkt fürs Erklären.`;
+  } else {
+    SA.beep(200, .4, "sawtooth"); SA.buzz(200);
+    $("rIcon").textContent = timeout ? "⏰" : "🏳️";
+    $("rHead").textContent = timeout ? "Zeit um!" : "Aufgegeben";
+    $("rText").innerHTML = `Das Wort war <b>${esc(G.word)}</b>. Diesmal kein Punkt.`;
+  }
+  drawBoard();
+  show("scrRes");
+}
+$("btnGot").onclick = () => result(true);
+$("btnGive").onclick = () => result(false);
+
+$("btnNext").onclick = () => {
+  G.pi++;
+  if (G.pi < G.pairs.length) { nextCard(); return; }
+  // Runde vorbei
+  if (G.round >= G.rounds) {
+    const sc = G.players.map(p => p.score), m = Math.max(...sc);
+    const top = sc.map((s, i) => s === m ? i : -1).filter(i => i >= 0);
+    if (top.length === 1) { win(top[0]); return; }
+    // Gleichstand: Extrarunde
+  }
+  G.round++;
+  startRound();
+};
+function win(w) {
+  $("wName").innerHTML = chip(w);
+  rank($("wRank"), G.players);
+  drawBoard(); $("roundLbl").textContent = "Endstand";
+  show("scrWin");
+}
+$("btnRematch").onclick = () => { G.players.forEach(p => p.score = 0); G.round = 1; startRound(); };
+$("btnNew").onclick = () => { $("board").hidden = true; $("roundLbl").textContent = ""; show("scrSetup"); };
+</script>
+</body>
+</html>
